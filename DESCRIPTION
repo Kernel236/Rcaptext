@@ -2,8 +2,8 @@ Package: Rcaptext
 Type: Package
 Title: Text Analysis Tools for Capstone Projects
 Version: 0.1.0
-Author: Ric (Kernel236) 
-Maintainer: Ric (Kernel236) 
+Author: Ric (Kernel236)
+Maintainer: Ric (Kernel236) <riccardo-del-signore@hotmail.it> 
 Description: A comprehensive R package for text analysis and natural language processing,
     specifically designed for capstone projects. Provides functions for corpus loading,
     text cleaning, tokenization (unigrams, bigrams, trigrams), frequency analysis,
@@ -33,5 +33,5 @@ Suggests:
     knitr,
     rmarkdown
 VignetteBuilder: knitr
-URL: https://github.com/Kernel236/rcaptext
-BugReports: https://github.com/Kernel236/rcaptext/issues
+URL: https://github.com/Kernel236/Rcaptext
+BugReports: https://github.com/Kernel236/Rcaptext/issues
