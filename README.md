@@ -1,4 +1,4 @@
-# rcaptext �
+# Rcaptext �
 
 <!-- badges: start -->
 [![R-CMD-check](https://img.shields.io/badge/R%20CMD%20check-probably%20works-brightgreen)](https://github.com/Kernel236/rcaptext)
@@ -120,29 +120,29 @@ The package relies on giants like:
 - Might have bugs (feedback welcome!)
 - I guarantee nothing 🤷‍♂️
 
-## Requisiti �
+## Requirements 🔧
 
 - R >= 3.6.0
-- Un pizzico di pazienza
-- Dati testuali da analizzare
-- Caffè (opzionale ma consigliato)
+- A pinch of patience
+- Text data to analyze
+- Coffee (optional but recommended)
 
-### Dipendenze
+### Dependencies
 
-Il package si appoggia su giganti come:
-- `dplyr` & `tidyr` - Per la manipolazione dati
-- `tidytext` - Per la tokenizzazione
-- `ggplot2` - Per i grafici
-- `stringr` - Per le stringhe
-- `hunspell` - Per lo spell checking
+The package relies on giants like:
+- `dplyr` & `tidyr` - For data manipulation
+- `tidytext` - For tokenization
+- `ggplot2` - For plots
+- `stringr` - For strings
+- `hunspell` - For spell checking
 
-## Limitazioni �
+## Limitations 🚧
 
-- Testato principalmente su corpus inglesi
-- Ottimizzato per i dataset SwiftKey
-- Documentazione scritta di fretta
-- Potrebbe avere bug (feedback welcome!)
-- Non garantisco nulla 🤷‍♂️
+- Mainly tested on English corpora
+- Optimized for SwiftKey datasets
+- Documentation written in a hurry
+- Might have bugs (feedback welcome!)
+- I guarantee nothing 🤷‍♂️
 
 ## Contributing 🤝
 
@@ -159,5 +159,3 @@ MIT License - do whatever you want, but don't blame me if something goes wrong.
 - Coffee for everything else
 
 ---
-
-*Made with ❤️ (and a bit of desperation) for the capstone project*
