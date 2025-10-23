@@ -1,0 +1,37 @@
+Package: rcaptext
+Type: Package
+Title: Text Analysis Tools for Capstone Projects
+Version: 0.1.0
+Author: Ric (Kernel236) 
+Maintainer: Ric (Kernel236) 
+Description: A comprehensive R package for text analysis and natural language processing,
+    specifically designed for capstone projects. Provides functions for corpus loading,
+    text cleaning, tokenization (unigrams, bigrams, trigrams), frequency analysis,
+    coverage statistics, and visualization. Includes specialized tools for handling
+    SwiftKey text corpora and exploratory data analysis of large text datasets.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.3.3
+Depends:
+    R (>= 3.6.0)
+Imports:
+    dplyr (>= 1.0.0),
+    tidyr (>= 1.1.0),
+    readr (>= 2.0.0),
+    stringr (>= 1.4.0),
+    tidytext (>= 0.3.0),
+    ggplot2 (>= 3.3.0),
+    scales (>= 1.1.0),
+    here (>= 1.0.0),
+    tibble (>= 3.1.0),
+    purrr (>= 0.3.0),
+    rlang (>= 0.4.0),
+    hunspell (>= 3.0.0),
+    parallel
+Suggests:
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
+URL: https://github.com/Kernel236/rcaptext
+BugReports: https://github.com/Kernel236/rcaptext/issues
