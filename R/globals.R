@@ -16,5 +16,11 @@ utils::globalVariables(c(
   ".data",
   # Language modeling variables
   "p_cond",     # conditional probability
-  "score"       # prediction score
+  "score",      # prediction score
+  # ML pipeline variables (make_test_trigrams.R)
+  ".row_id",    # row identifier for train/test split
+  ".text",      # temporary text column in test case generation
+  ".wc",        # word count column in test case generation
+  "input_text", # input context for test cases
+  "target"      # target word for test cases
 ))
