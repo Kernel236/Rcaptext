@@ -4,24 +4,13 @@
 \alias{flag_non_english}
 \title{Detect Non-English Words}
 \usage{
-flag_non_english(
-  words,
-  dict = "en_US",
-  n_cores = NULL,
-  parallel_threshold = 5000
-)
+flag_non_english(words, dict = "en_US")
 }
 \arguments{
 \item{words}{Character vector. Words to check (should be in lowercase).}
 
 \item{dict}{Character or hunspell dictionary object. Dictionary to use for
 spell checking. Default is "en_US".}
-
-\item{n_cores}{Integer. Number of CPU cores to use for parallel processing.
-Default is NULL (uses parallel::detectCores() - 4). Set to 1 for sequential processing.}
-
-\item{parallel_threshold}{Integer. Minimum number of words to trigger
-parallel processing. Default is 5000.}
 }
 \value{
 Logical vector of same length as \code{words}: TRUE indicates
@@ -31,7 +20,6 @@ Logical vector of same length as \code{words}: TRUE indicates
 This function uses hunspell dictionary to identify words that are likely
 not English. It's useful for filtering multilingual corpora or detecting
 foreign language content in predominantly English text.
-Uses parallel processing for large word vectors.
 }
 \details{
 The function applies several heuristics:
@@ -41,8 +29,6 @@ The function applies several heuristics:
   \item Contractions with apostrophes are generally preserved
   \item Uses hunspell for spell checking remaining tokens
 }
-
-For large word vectors, the function automatically uses parallel processing.
 }
 \examples{
 \dontrun{
@@ -52,9 +38,6 @@ flag_non_english(test_words)
 
 # Use different dictionary
 flag_non_english(c("colour", "color"), dict = "en_GB")
-
-# Force sequential processing
-flag_non_english(test_words, n_cores = 1)
 }
 
 }

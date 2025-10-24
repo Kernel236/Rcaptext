@@ -8,9 +8,7 @@ filter_non_english_unigrams(
   freq_uni,
   dict = "en_US",
   min_len = 2,
-  keep_stopwords = TRUE,
-  n_cores = NULL,
-  parallel_threshold = 5000
+  keep_stopwords = TRUE
 )
 }
 \arguments{
@@ -25,12 +23,6 @@ this are automatically removed. Default is 2.}
 
 \item{keep_stopwords}{Logical. If TRUE, preserves standard English stopwords
 even if flagged by spell checker. Default is TRUE.}
-
-\item{n_cores}{Integer. Number of CPU cores to use for parallel processing.
-Default is NULL (auto-detect). Set to 1 for sequential processing.}
-
-\item{parallel_threshold}{Integer. Minimum vocabulary size to trigger
-parallel processing. Default is 5000.}
 }
 \value{
 A filtered tibble with the same structure as input, but with
@@ -39,7 +31,6 @@ A filtered tibble with the same structure as input, but with
 \description{
 This function removes likely non-English words from a unigram frequency table,
 with options to preserve common stopwords and handle short tokens.
-Uses parallel processing for large vocabularies.
 }
 \details{
 The function performs these steps:
@@ -71,9 +62,6 @@ strict_freq <- filter_non_english_unigrams(
   min_len = 3, 
   keep_stopwords = FALSE
 )
-
-# Force sequential processing
-seq_freq <- filter_non_english_unigrams(freq_table, n_cores = 1)
 }
 
 }

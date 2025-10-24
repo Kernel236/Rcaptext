@@ -8,7 +8,8 @@
 #' @param lang Character. Language code prefix (e.g. "en_US", "de_DE"). Default is "en_US".
 #' @param base_dir Character. Directory where raw data are stored. Default is "data/raw".
 #' @param n_cores Integer. Number of CPU cores for parallel file reading.
-#'   Default is NULL (uses parallel::detectCores() - 4). Set to 1 for sequential processing.
+#'   Default is NULL (uses parallel::detectCores() - 6 to preserve system resources).
+#'   Set to 1 for sequential processing.
 #'
 #' @return A tibble with columns: 
 #'   \describe{
@@ -21,7 +22,8 @@
 #' \code{[lang].[source].txt} (e.g., "en_US.blogs.txt", "en_US.news.txt", "en_US.twitter.txt").
 #' 
 #' Text encoding is normalized to UTF-8 to handle various input encodings safely.
-#' Files are read with progress indicators for large datasets.
+#' Uses parallel processing to read the 3 files simultaneously, with explicit
+#' garbage collection after reading to free memory immediately.
 #'
 #' @examples
 #' \dontrun{
@@ -63,15 +65,18 @@ load_corpus <- function(lang = "en_US", base_dir = "data/raw", n_cores = NULL) {
   message(sprintf("  - news:    %s", f_news))
   message(sprintf("  - twitter: %s", f_twitter))
   
-  # Determine number of cores
+  # Determine number of cores (conservative to avoid RAM saturation)
   if (is.null(n_cores)) {
-    n_cores <- max(1, parallel::detectCores() - 4)
+    n_cores <- max(1, parallel::detectCores() - 6)
   }
   message(sprintf("• Setting up parallel processing with %d cores...", n_cores))
   
   # --- Setup parallel processing ---
   cl <- parallel::makeCluster(n_cores)
-  on.exit(parallel::stopCluster(cl))  # Ensure cluster is closed even if function fails
+  on.exit({
+    parallel::stopCluster(cl)
+    gc()  # Force garbage collection to free memory
+  })
   
   # Load required packages on cluster nodes
   parallel::clusterEvalQ(cl, library(readr))
@@ -88,6 +93,10 @@ load_corpus <- function(lang = "en_US", base_dir = "data/raw", n_cores = NULL) {
   blogs   <- file_data[[1]]
   news    <- file_data[[2]]
   twitter <- file_data[[3]]
+  
+  # Free memory immediately after extraction
+  rm(file_data)
+  gc()
   
   # --- Combine all sources into a single tibble ---
   corpus <- tibble::tibble(

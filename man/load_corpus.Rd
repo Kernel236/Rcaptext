@@ -12,7 +12,8 @@ load_corpus(lang = "en_US", base_dir = "data/raw", n_cores = NULL)
 \item{base_dir}{Character. Directory where raw data are stored. Default is "data/raw".}
 
 \item{n_cores}{Integer. Number of CPU cores for parallel file reading.
-Default is NULL (uses parallel::detectCores() - 4). Set to 1 for sequential processing.}
+Default is NULL (uses parallel::detectCores() - 6 to preserve system resources).
+Set to 1 for sequential processing.}
 }
 \value{
 A tibble with columns: 
@@ -32,7 +33,8 @@ The function expects files to follow the standard SwiftKey naming convention:
 \code{[lang].[source].txt} (e.g., "en_US.blogs.txt", "en_US.news.txt", "en_US.twitter.txt").
 
 Text encoding is normalized to UTF-8 to handle various input encodings safely.
-Files are read with progress indicators for large datasets.
+Uses parallel processing to read the 3 files simultaneously, with explicit
+garbage collection after reading to free memory immediately.
 }
 \examples{
 \dontrun{
