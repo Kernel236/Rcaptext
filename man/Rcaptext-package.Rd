@@ -6,7 +6,7 @@
 \alias{Rcaptext-package}
 \title{rcaptext: Text Analysis Tools for Capstone Projects}
 \description{
-A comprehensive R package for text analysis and natural language processing,
+A R package for text analysis and natural language processing,
 specifically designed for capstone projects and exploratory data analysis
 of large text corpora.
 }
