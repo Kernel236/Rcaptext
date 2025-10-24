@@ -143,7 +143,7 @@ build_cond_trigram <- function(freq_tri) {
 #' tri_freq <- freq_trigrams(tokens_tri)
 #' 
 #' # Build a compact language model
-#' lm_model <- build_pruned_lm(
+#' lang_model <- build_pruned_lang_model(
 #'   freq_uni = uni_freq,
 #'   freq_bi = bi_freq, 
 #'   freq_tri = tri_freq,
@@ -156,16 +156,16 @@ build_cond_trigram <- function(freq_tri) {
 #' )
 #' 
 #' # Check model statistics
-#' print(lm_model$meta$sizes)
+#' print(lang_model$meta$sizes)
 #' 
 #' # Use for prediction
-#' predictions <- predict_next("I love", lm_model$tri_pruned, 
-#'                            lm_model$bi_pruned, lm_model$uni_lookup)
+#' predictions <- predict_next("I love", lang_model$tri_pruned, 
+#'                            lang_model$bi_pruned, lang_model$uni_lookup)
 #' }
 #'
 #' @importFrom magrittr %>%
 #' @export
-build_pruned_lm <- function(freq_uni, freq_bi, freq_tri,
+build_pruned_lang_model <- function(freq_uni, freq_bi, freq_tri,
                             min_count_bi = 2, min_count_tri = 2,
                             topN_bi = 12, topN_tri = 8,
                             save = FALSE, out_dir = "data/processed") {
@@ -207,7 +207,7 @@ build_pruned_lm <- function(freq_uni, freq_bi, freq_tri,
     saveRDS(uni_lookup, file.path(out_dir, "uni_lookup.rds"))
     saveRDS(bi_pruned,  file.path(out_dir, "bi_pruned.rds"))
     saveRDS(tri_pruned, file.path(out_dir, "tri_pruned.rds"))
-    saveRDS(meta,       file.path(out_dir, "lm_meta.rds"))
+    saveRDS(meta,       file.path(out_dir, "lang_meta.rds"))
   }
 
   list(

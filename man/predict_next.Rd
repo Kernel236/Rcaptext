@@ -70,15 +70,15 @@ The Stupid Backoff algorithm works as follows:
 }
 \examples{
 \dontrun{
-# Assuming you have trained models from build_pruned_lm()
-lm_model <- build_pruned_lm(freq_uni, freq_bi, freq_tri)
+# Assuming you have trained models from build_pruned_lang_model()
+lang_model <- build_pruned_lang_model(freq_uni, freq_bi, freq_tri)
 
 # Predict next word after "I love"
 predictions <- predict_next(
   input = "I love",
-  tri_pruned = lm_model$tri_pruned,
-  bi_pruned = lm_model$bi_pruned, 
-  uni_lookup = lm_model$uni_lookup,
+  tri_pruned = lang_model$tri_pruned,
+  bi_pruned = lang_model$bi_pruned, 
+  uni_lookup = lang_model$uni_lookup,
   alpha = 0.4,
   top_k = 5
 )
@@ -90,13 +90,13 @@ print(predictions)
 # 3 this  0.15 unigram
 
 # Handle empty/short input
-empty_pred <- predict_next("", lm_model$tri_pruned, 
-                          lm_model$bi_pruned, lm_model$uni_lookup)
+empty_pred <- predict_next("", lang_model$tri_pruned, 
+                          lang_model$bi_pruned, lang_model$uni_lookup)
 # Returns top unigrams with alpha^2 penalty
 
 # Single word input (only bigram + unigram possible)
-single_pred <- predict_next("hello", lm_model$tri_pruned,
-                           lm_model$bi_pruned, lm_model$uni_lookup) 
+single_pred <- predict_next("hello", lang_model$tri_pruned,
+                           lang_model$bi_pruned, lang_model$uni_lookup) 
 }
 
 }

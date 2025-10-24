@@ -2,7 +2,7 @@
 
 export(build_cond_bigram)
 export(build_cond_trigram)
-export(build_pruned_lm)
+export(build_pruned_lang_model)
 export(clean_text)
 export(coverage_from_freq)
 export(extract_last_tokens)

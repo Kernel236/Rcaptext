@@ -17,6 +17,8 @@ A modest collection of R functions for text analysis, born from the ashes of my 
 - **Cleans text** - removes URLs, emojis, and other junk you don't need
 - **Tokenizes** - unigrams, bigrams, trigrams... the usual stuff
 - **Counts frequencies** - because counting matters
+- **Builds language models** - n-gram models with conditional probabilities
+- **Predicts text** - next word prediction with Stupid Backoff
 - **Makes pretty plots** - to impress supervisors and committees
 
 ## Installation 🚀
@@ -44,14 +46,36 @@ sample_data$text <- clean_text(sample_data$text)
 # 4. Tokenize
 unigrams <- tokenize_unigrams(sample_data)
 bigrams <- tokenize_bigrams(sample_data)
+trigrams <- tokenize_trigrams(sample_data)
 
 # 5. Count and analyze
-freq_table <- freq_unigrams(unigrams)
-coverage <- coverage_from_freq(freq_table)
+freq_uni <- freq_unigrams(unigrams)
+freq_bi <- freq_bigrams(bigrams)
+freq_tri <- freq_trigrams(trigrams)
 
-# 6. Make plots (the fun part)
-plot_top_terms(freq_table, top = 15)
-plot_cumulative_coverage(freq_table)
+# 6. Build a language model for text prediction
+lang_model <- build_pruned_lang_model(
+  freq_uni = freq_uni,
+  freq_bi = freq_bi,
+  freq_tri = freq_tri,
+  min_count_bi = 2,
+  min_count_tri = 2,
+  topN_bi = 12,
+  topN_tri = 8
+)
+
+# 7. Predict next word
+predictions <- predict_next(
+  input = "I love",
+  tri_pruned = lang_model$tri_pruned,
+  bi_pruned = lang_model$bi_pruned,
+  uni_lookup = lang_model$uni_lookup,
+  top_k = 5
+)
+
+# 8. Make plots (the fun part)
+plot_top_terms(freq_uni, top = 15)
+plot_cumulative_coverage(freq_uni)
 ```
 
 ## Package Structure 📦
@@ -59,13 +83,16 @@ plot_cumulative_coverage(freq_table)
 ```
 rcaptext/
 ├── R/
-│   ├── corpus.R          # Load & sample corpora
-│   ├── text_cleaning.R   # Clean & filter text
-│   ├── tokenization.R    # Create tokens
-│   ├── frequency.R       # Count stuff
-│   ├── coverage.R        # Coverage analysis
-│   └── visualization.R   # Pretty plots
-└──  man/                  # Documentation (auto-generated)
+│   ├── corpus.R            # Load & sample corpora
+│   ├── text_cleaning.R     # Clean & filter text
+│   ├── tokenization.R      # Create tokens
+│   ├── frequency.R         # Count stuff
+│   ├── coverage.R          # Coverage analysis
+│   ├── language_modeling.R # Build n-gram models 🆕
+│   ├── pruning.R           # Prune models 🆕
+│   ├── prediction.R        # Text prediction 🆕
+│   └── visualization.R     # Pretty plots
+└──  man/                    # Documentation (auto-generated)
 ```
 
 ## Main Functions 🔧
@@ -90,6 +117,17 @@ rcaptext/
 - `freq_ngrams()` - Count n-grams
 - `coverage_from_freq()` - Coverage analysis
 
+### Language Modeling 🆕
+- `build_cond_bigram()` - Compute P(w2 | w1) conditional probabilities
+- `build_cond_trigram()` - Compute P(w3 | w1, w2) conditional probabilities
+- `build_pruned_lang_model()` - Build complete pruned n-gram language model
+- `prune_by_min_count()` - Remove rare n-grams
+- `prune_topN_per_history()` - Keep only top-N continuations per context
+
+### Text Prediction 🆕
+- `extract_last_tokens()` - Extract context words from input
+- `predict_next()` - Predict next word with Stupid Backoff algorithm
+
 ### Visualization
 - `plot_top_terms()` - The most popular ones
 - `plot_cumulative_coverage()` - Coverage curves
@@ -110,31 +148,8 @@ The package relies on giants like:
 - `ggplot2` - For plots
 - `stringr` - For strings
 - `hunspell` - For spell checking
+- `magrittr` - For pipe operator
 - `parallel` - For faster loading (8 cores)
-
-## Limitations 🚧
-
-- Mainly tested on English corpora
-- Optimized for SwiftKey datasets
-- Documentation written in a hurry
-- Might have bugs (feedback welcome!)
-- I guarantee nothing 🤷‍♂️
-
-## Requirements 🔧
-
-- R >= 3.6.0
-- A pinch of patience
-- Text data to analyze
-- Coffee (optional but recommended)
-
-### Dependencies
-
-The package relies on giants like:
-- `dplyr` & `tidyr` - For data manipulation
-- `tidytext` - For tokenization
-- `ggplot2` - For plots
-- `stringr` - For strings
-- `hunspell` - For spell checking
 
 ## Limitations 🚧
 
