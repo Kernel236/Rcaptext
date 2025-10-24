@@ -27,7 +27,7 @@ A modest collection of R functions for text analysis, born from the ashes of my 
 ```r
 # From GitHub (the only place it lives)
 # install.packages("devtools")  # if you don't have it already
-devtools::install_github("Kernel236/rcaptext")
+devtools::install_github("Kernel236/Rcaptext")
 ```
 
 ## Quick Start 🏃‍♂️
