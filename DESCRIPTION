@@ -28,7 +28,8 @@ Imports:
     purrr (>= 0.3.0),
     rlang (>= 0.4.0),
     hunspell (>= 3.0.0),
-    parallel
+    parallel,
+    magrittr
 Suggests:
     knitr,
     rmarkdown

@@ -13,5 +13,9 @@ utils::globalVariables(c(
   "is_short",
   "stop_words",
   "w1", "w2", "w3", "w4", "w5",  # for n-grams up to 5-grams
-  ".data"
+  ".data",
+  # Language modeling variables
+  "p_cond",     # conditional probability
+  "next",       # unigram lookup column
+  "score"       # prediction score
 ))
