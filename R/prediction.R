@@ -149,8 +149,8 @@ predict_next <- function(input, tri_pruned, bi_pruned, uni_lookup,
   if (length(last2) == 0) {
     return(
       uni_lookup %>%
-        dplyr::transmute(word = word, score = (alpha^2) * p, source = "unigram") %>%
-        dplyr::arrange(dplyr::desc(score)) %>%
+        dplyr::transmute(word = .data$word, score = (alpha^2) * .data$p, source = "unigram") %>%
+        dplyr::arrange(dplyr::desc(.data$score)) %>%
         dplyr::slice_head(n = top_k)
     )
   }
@@ -164,23 +164,23 @@ predict_next <- function(input, tri_pruned, bi_pruned, uni_lookup,
   tri_cand <- NULL
   if (!is.na(w1) && !is.na(w2)) {
     tri_cand <- tri_pruned %>%
-      dplyr::filter(w1 == !!w1, w2 == !!w2) %>%
-      dplyr::transmute(word = w3, score = p_cond, source = "trigram")
+      dplyr::filter(.data$w1 == !!w1, .data$w2 == !!w2) %>%
+      dplyr::transmute(word = .data$w3, score = .data$p_cond, source = "trigram")
   }
 
   # 2) BIGRAM candidates (one-word history) with backoff alpha
   bi_cand <- bi_pruned %>%
-    dplyr::filter(w1 == !!last1) %>%
-    dplyr::transmute(word = w2, score = alpha * p_cond, source = "bigram")
+    dplyr::filter(.data$w1 == !!last1) %>%
+    dplyr::transmute(word = .data$w2, score = alpha * .data$p_cond, source = "bigram")
 
   # 3) UNIGRAM fallback with alpha^2
   uni_cand <- uni_lookup %>%
-    dplyr::transmute(word = word, score = (alpha^2) * p, source = "unigram")
+    dplyr::transmute(word = .data$word, score = (alpha^2) * .data$p, source = "unigram")
 
   # 4) Combine, deduplicate by best score, rank and top-k
   dplyr::bind_rows(tri_cand, bi_cand, uni_cand) %>%
-    dplyr::group_by(word) %>%
-    dplyr::summarise(score = max(score), source = source[which.max(score)], .groups = "drop") %>%
-    dplyr::arrange(dplyr::desc(score)) %>%
+    dplyr::group_by(.data$word) %>%
+    dplyr::summarise(score = max(.data$score), source = .data$source[which.max(.data$score)], .groups = "drop") %>%
+    dplyr::arrange(dplyr::desc(.data$score)) %>%
     dplyr::slice_head(n = top_k)
 }
