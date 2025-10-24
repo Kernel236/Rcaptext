@@ -20,7 +20,7 @@ A modest collection of R functions for text analysis, born from the ashes of my 
 - **Builds language models** - n-gram models with conditional probabilities
 - **Predicts text** - next word prediction with Stupid Backoff
 - **Makes pretty plots** - to impress supervisors and committees
-- **Parallel processing** ⚡ - automatic multi-core support for heavy operations
+- **Parallel processing** ⚡ - multi-core file loading for faster corpus import
 
 ## Installation 🚀
 
@@ -42,7 +42,7 @@ corpus <- load_corpus("en_US", base_dir = "data/raw")
 sample_data <- sample_corpus(corpus, prop = 0.05, seed = 42)
 
 # 3. Clean the text (goodbye junk)
-sample_data$text <- clean_text(sample_data$text)  # Automatically uses parallel processing for large datasets
+sample_data$text <- clean_text(sample_data$text)
 
 # 4. Tokenize
 unigrams <- tokenize_unigrams(sample_data)
@@ -79,6 +79,50 @@ plot_top_terms(freq_uni, top = 15)
 plot_cumulative_coverage(freq_uni)
 ```
 
+## How Language Modeling Works 🧠
+
+The package implements a complete **n-gram language modeling** pipeline with **Stupid Backoff** for text prediction:
+
+### 1. **Build Conditional Probabilities**
+```r
+# P(w2 | w1) - probability of w2 given w1
+bi_cond <- build_cond_bigram(freq_bi)
+
+# P(w3 | w1, w2) - probability of w3 given w1, w2
+tri_cond <- build_cond_trigram(freq_tri)
+```
+
+### 2. **Prune the Models**
+```r
+# Remove rare n-grams (min count threshold)
+bi_pruned <- prune_by_min_count(bi_cond, min_count = 2)
+tri_pruned <- prune_by_min_count(tri_cond, min_count = 2)
+
+# Keep only top-N most probable continuations per history
+bi_pruned <- prune_topN_per_history(bi_pruned, history_cols = "w1", 
+                                     target_col = p_cond, N = 12)
+tri_pruned <- prune_topN_per_history(tri_pruned, history_cols = c("w1", "w2"),
+                                      target_col = p_cond, N = 8)
+```
+
+### 3. **Predict with Stupid Backoff**
+The algorithm tries models in order of specificity:
+1. **Trigram**: If `(w1, w2)` context available → use `P(w3 | w1, w2)`
+2. **Bigram**: If only `w1` context → use `α × P(w2 | w1)` (with backoff penalty)
+3. **Unigram**: No context → use `α² × P(w)` (fallback to word frequency)
+
+```r
+# Predict next word after "I love"
+predict_next("I love", tri_pruned, bi_pruned, uni_lookup, 
+             alpha = 0.4, top_k = 5)
+#   word  score    source
+#   you   0.35    trigram
+#   it    0.28    bigram
+#   the   0.15    unigram
+```
+
+The `alpha` parameter (default 0.4) penalizes lower-order models, giving preference to higher-order n-grams when available.
+
 ## Package Structure 📦
 
 ```
@@ -99,40 +143,42 @@ rcaptext/
 ## Main Functions 🔧
 
 ### Corpus Management
-- `load_corpus()` - Load the famous SwiftKey files
+- `load_corpus()` - Load the famous SwiftKey files (with parallel processing)
 - `sample_corpus()` - Take a representative chunk
 
 ### Text Cleaning
 - `clean_text()` - Normalize text (goodbye emojis 👋)
-- `flag_non_english()` - Find foreign words
+- `flag_non_english()` - Find foreign words using hunspell
 - `filter_non_english_unigrams()` - Filter multilingual chaos
 
 ### Tokenization
 - `tokenize_unigrams()` - Single words
 - `tokenize_bigrams()` - Word pairs
 - `tokenize_trigrams()` - Word triplets
-- `tokenize_ngrams()` - Generic n-grams
+- `tokenize_ngrams()` - Generic n-grams (flexible n)
 
 ### Frequency Analysis
-- `freq_unigrams()` - Count words
-- `freq_ngrams()` - Count n-grams
-- `coverage_from_freq()` - Coverage analysis
+- `freq_unigrams()` - Count single words
+- `freq_bigrams()` - Count word pairs
+- `freq_trigrams()` - Count word triplets
+- `freq_ngrams()` - Generic n-gram frequencies
+- `coverage_from_freq()` - Coverage analysis for vocabulary
 
 ### Language Modeling 🆕
-- `build_cond_bigram()` - Compute P(w2 | w1) conditional probabilities
-- `build_cond_trigram()` - Compute P(w3 | w1, w2) conditional probabilities
+- `build_cond_bigram()` - Compute P(w2 | w1) conditional probabilities with MLE
+- `build_cond_trigram()` - Compute P(w3 | w1, w2) conditional probabilities with MLE
 - `build_pruned_lang_model()` - Build complete pruned n-gram language model
-- `prune_by_min_count()` - Remove rare n-grams
+- `prune_by_min_count()` - Remove rare n-grams by frequency threshold
 - `prune_topN_per_history()` - Keep only top-N continuations per context
 
 ### Text Prediction 🆕
-- `extract_last_tokens()` - Extract context words from input
+- `extract_last_tokens()` - Extract context words from user input
 - `predict_next()` - Predict next word with Stupid Backoff algorithm
 
 ### Visualization
-- `plot_top_terms()` - The most popular ones
-- `plot_cumulative_coverage()` - Coverage curves
-- `plot_rank_frequency()` - Zipf plots (for nerds)
+- `plot_top_terms()` - Bar plot of most frequent terms
+- `plot_cumulative_coverage()` - Cumulative coverage curves
+- `plot_rank_frequency()` - Zipf's law visualization (log-log plots)
 
 ## Requirements �
 
@@ -147,10 +193,13 @@ The package relies on giants like:
 - `dplyr` & `tidyr` - For data manipulation
 - `tidytext` - For tokenization
 - `ggplot2` - For plots
-- `stringr` - For strings
+- `stringr` - For string operations
 - `hunspell` - For spell checking
-- `magrittr` - For pipe operator
-- `parallel` - For faster loading (8 cores)
+- `magrittr` - For pipe operator (`%>%`)
+- `parallel` - For multi-core file loading
+- `readr` - For efficient file reading
+- `here` - For path management
+- `tibble` - For modern data frames
 
 ## Limitations 🚧
 
@@ -162,27 +211,28 @@ The package relies on giants like:
 
 ## Performance ⚡
 
-The package automatically uses **parallel processing** for computationally intensive operations:
+The package uses **parallel processing** strategically for I/O-bound operations:
 
-- **`load_corpus()`** - Multi-core file reading
-- **`clean_text()`** - Parallel text cleaning for vectors >= 1000 items
-- **`flag_non_english()`** - Parallel spell checking for vocabularies >= 5000 words  
-- **`filter_non_english_unigrams()`** - Parallel filtering of large frequency tables
+- **`load_corpus()`** - Multi-core file reading (reads 3 files simultaneously)
 
-By default, the package uses `detectCores() - 4` cores to leave plenty of resources for the system and other applications. You can control this with the `n_cores` parameter:
+By default, `load_corpus()` uses `detectCores() - 6` cores to leave plenty of resources for the system and other applications. You can control this with the `n_cores` parameter:
 
 ```r
-# Force sequential processing
-clean_text(corpus$text, n_cores = 1)
-
 # Use specific number of cores
-clean_text(corpus$text, n_cores = 4)
+corpus <- load_corpus("en_US", n_cores = 2)
 
-# Auto-detect (default)
-clean_text(corpus$text)  # Uses all available cores - 4
+# Force sequential processing (1 core)
+corpus <- load_corpus("en_US", n_cores = 1)
+
+# Auto-detect (default: all cores - 6)
+corpus <- load_corpus("en_US")
 ```
 
-For small datasets, operations run sequentially to avoid parallelization overhead.
+**Note**: All text processing, tokenization, and frequency computation functions are fully sequential. This design choice ensures:
+- ✅ Lower memory consumption
+- ✅ Better performance for typical workloads
+- ✅ No parallelization overhead
+- ✅ Simpler debugging
 
 ## Contributing 🤝
 
