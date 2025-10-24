@@ -228,31 +228,28 @@ failures <- results$per_case %>%
   - More lenient, suitable for desktop autocomplete
   - Better coverage but requires more user scanning
 
-**Why it matters:**
-- Mobile keyboards show 3 suggestions → Accuracy@3 is key metric
-- Higher accuracy = fewer keystrokes = better user experience
-- Latency matters too: predictions must be <50ms (p95) for real-time typing
-
-**Typical benchmarks:**
-- Good model: Accuracy@3 ≈ 30-40%
-- State-of-the-art: Accuracy@3 ≈ 50-60% (with neural models)
-- Your mileage may vary (depends on corpus, domain, model size)
 
 ## Package Structure 📦
 
 ```
-rcaptext/
+Rcaptext/
 ├── R/
-│   ├── corpus.R            # Load & sample corpora
-│   ├── text_cleaning.R     # Clean & filter text
-│   ├── tokenization.R      # Create tokens
-│   ├── frequency.R         # Count stuff
-│   ├── coverage.R          # Coverage analysis
-│   ├── language_modeling.R # Build n-gram models 🆕
-│   ├── pruning.R           # Prune models 🆕
-│   ├── prediction.R        # Text prediction 🆕
-│   └── visualization.R     # Pretty plots
-└──  man/                    # Documentation (auto-generated)
+│   ├── corpus.R              # Load & sample corpora
+│   ├── tokenization.R        # N-gram tokenization
+│   ├── text_cleaning.R       # Text normalization & filtering
+│   ├── frequency.R           # N-gram frequency computation
+│   ├── coverage.R            # Coverage statistics
+│   ├── language_modeling.R   # Conditional probability models
+│   ├── pruning.R             # Model pruning utilities
+│   ├── prediction.R          # Next-word prediction (Stupid Backoff)
+│   ├── split_corpus.R        # Train/test splitting
+│   ├── test_trigrams.R       # Test case generation
+│   ├── build_model.R         # End-to-end model pipeline
+│   ├── accuracy_evaluation.R # Accuracy@k metrics & timing
+│   ├── visualization.R       # Plotting functions
+│   ├── globals.R             # Global variable declarations
+│   └── rcaptext-package.R    # Package documentation
+└── man/                      # Documentation (auto-generated)
 ```
 
 ## Main Functions 🔧
@@ -330,25 +327,6 @@ The package relies on giants like:
 - Documentation written in a hurry
 - Might have bugs (feedback welcome!)
 - I guarantee nothing 🤷‍♂️
-
-## Performance ⚡
-
-The package uses **parallel processing** strategically for I/O-bound operations:
-
-- **`load_corpus()`** - Multi-core file reading (reads 3 files simultaneously)
-
-By default, `load_corpus()` uses `detectCores() - 6` cores to leave plenty of resources for the system and other applications. You can control this with the `n_cores` parameter:
-
-```r
-# Use specific number of cores
-corpus <- load_corpus("en_US", n_cores = 2)
-
-# Force sequential processing (1 core)
-corpus <- load_corpus("en_US", n_cores = 1)
-
-# Auto-detect (default: all cores - 6)
-corpus <- load_corpus("en_US")
-```
 
 **Note**: All text processing, tokenization, and frequency computation functions are fully sequential. This design choice ensures:
 - ✅ Lower memory consumption
