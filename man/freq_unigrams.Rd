@@ -4,17 +4,11 @@
 \alias{freq_unigrams}
 \title{Compute Frequency Table for Unigrams}
 \usage{
-freq_unigrams(unigrams, n_cores = NULL, parallel_threshold = 1e+05)
+freq_unigrams(unigrams)
 }
 \arguments{
 \item{unigrams}{A tibble with a column named "word", typically from
 \code{\link{tokenize_unigrams}}.}
-
-\item{n_cores}{Integer. Number of CPU cores for parallel processing.
-Default is NULL (uses parallel::detectCores() - 6). Set to 1 for sequential processing.}
-
-\item{parallel_threshold}{Integer. Minimum number of rows to trigger parallel processing.
-Default is 100000. Smaller datasets are processed sequentially.}
 }
 \value{
 A tibble with columns:
@@ -28,12 +22,6 @@ A tibble with columns:
 \description{
 This function creates a frequency table from tokenized unigrams, showing
 both absolute counts and relative frequencies for each unique word.
-Uses parallel processing for large datasets to improve performance.
-}
-\details{
-For large datasets (>= parallel_threshold), the function splits data into chunks,
-computes partial counts in parallel, then aggregates results. This significantly
-speeds up frequency computation on million-row datasets.
 }
 \examples{
 \dontrun{
@@ -44,9 +32,6 @@ head(freq_table)
 
 # Check most common words
 head(freq_table, 10)
-
-# Force sequential processing
-freq_seq <- freq_unigrams(unigrams, n_cores = 1)
 }
 
 }

@@ -4,7 +4,7 @@
 \alias{freq_ngrams}
 \title{Compute Frequency Table for N-grams}
 \usage{
-freq_ngrams(ngrams_tbl, n = 2, n_cores = NULL, parallel_threshold = 50000)
+freq_ngrams(ngrams_tbl, n = 2)
 }
 \arguments{
 \item{ngrams_tbl}{A tibble with an "ng" column containing n-grams,
@@ -12,12 +12,6 @@ typically from \code{\link{tokenize_ngrams}}.}
 
 \item{n}{Integer. Length of the n-gram (2 for bigrams, 3 for trigrams).
 Must be >= 2.}
-
-\item{n_cores}{Integer. Number of CPU cores for parallel processing.
-Default is NULL (uses parallel::detectCores() - 6). Set to 1 for sequential processing.}
-
-\item{parallel_threshold}{Integer. Minimum number of rows to trigger parallel processing.
-Default is 50000. Smaller datasets are processed sequentially.}
 }
 \value{
 A tibble with columns:
@@ -31,15 +25,11 @@ A tibble with columns:
 \description{
 This function creates frequency tables from n-gram data, splitting each
 n-gram into separate word components and computing frequencies.
-Uses parallel processing for large datasets to improve performance.
 }
 \details{
 The function splits n-grams (e.g., "hello world") into separate columns
 (w1 = "hello", w2 = "world") for easier analysis and language modeling.
 Incomplete n-grams (with missing words) are filtered out.
-
-For large datasets (>= parallel_threshold), the function processes data in parallel,
-splitting and counting n-grams across multiple cores before aggregating results.
 }
 \examples{
 \dontrun{
@@ -53,9 +43,6 @@ head(freq_bi)
 trigrams <- tokenize_trigrams(corpus)
 freq_tri <- freq_ngrams(trigrams, n = 3)
 head(freq_tri)
-
-# Force sequential processing
-freq_bi_seq <- freq_ngrams(bigrams, n = 2, n_cores = 1)
 }
 
 }
