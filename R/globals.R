@@ -22,5 +22,7 @@ utils::globalVariables(c(
   ".text",      # temporary text column in test case generation
   ".wc",        # word count column in test case generation
   "input_text", # input context for test cases
-  "target"      # target word for test cases
+  "target",     # target word for test cases
+  # Accuracy evaluation variables (model_accuracy@k.R)
+  "rank_hit"    # hit rank in accuracy evaluation
 ))

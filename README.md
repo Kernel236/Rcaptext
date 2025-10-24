@@ -123,6 +123,121 @@ predict_next("I love", tri_pruned, bi_pruned, uni_lookup,
 
 The `alpha` parameter (default 0.4) penalizes lower-order models, giving preference to higher-order n-grams when available.
 
+## ML Pipeline & Model Evaluation 🔬
+
+The package includes a complete **machine learning pipeline** for training and evaluating next-word prediction models:
+
+### 1. **Train/Test Split**
+```r
+# Stratified split maintaining source distribution
+corpus <- load_corpus("en_US")
+splits <- split_corpus(corpus, prop_test = 0.1, by_source = TRUE, seed = 42)
+
+# Now you have:
+# - splits$train (90% of data)
+# - splits$test  (10% held-out)
+```
+
+### 2. **Build Model (End-to-End)**
+```r
+# Complete pipeline: clean → tokenize → frequencies → filter → prune → save
+model <- build_model(
+  train_corpus = splits$train,
+  sample_prop = 0.1,      # Use 10% for faster iteration
+  oov_filter = TRUE,      # Remove foreign/misspelled words
+  min_count_bi = 2,       # Prune rare bigrams
+  min_count_tri = 2,      # Prune rare trigrams
+  topN_bi = 12,           # Keep top-12 bigram continuations
+  topN_tri = 8,           # Keep top-8 trigram continuations
+  out_dir = "models/v1",  # Save RDS files here
+  save = TRUE
+)
+```
+
+### 3. **Generate Test Cases**
+```r
+# Create (context → target) test cases from held-out data
+test_data <- make_test_trigrams(
+  corpus = splits$test,
+  text_col = "text_clean",
+  prop = 0.2,        # Sample 20% of test corpus
+  min_words = 3,     # Need at least 3 words for trigrams
+  by_source = TRUE   # Stratified sampling
+)
+
+# Each row: input_text = "w1 w2", target = "w3"
+head(test_data)
+#   input_text    w1    w2  target  source
+#   "the quick"  the quick  brown   news
+#   "i love"      i   love    you   blogs
+```
+
+### 4. **Evaluate Accuracy@k**
+```r
+# Measure how often the correct word appears in top-k predictions
+results <- evaluate_accuracy_at_k(
+  test_windows = test_data,
+  tri_pruned = model$tri_pruned,
+  bi_pruned = model$bi_pruned,
+  uni_lookup = model$uni_lookup,
+  ks = c(1, 3, 5),    # Test accuracy@1, @3, @5
+  timeit = TRUE,      # Measure prediction speed
+  timing_n = 200      # Time 200 random predictions
+)
+
+# View results
+print(results$accuracy)
+#   k  accuracy
+# 1 1  0.182      # 18.2% exact match (top-1)
+# 2 3  0.341      # 34.1% in top-3
+# 3 5  0.428      # 42.8% in top-5
+
+print(results$timing)
+#   mean_ms  p50_ms  p95_ms  n_calls
+#      12.3    10.5    28.4      200
+# ✅ Fast enough for real-time keyboard (target: <50ms p95)
+```
+
+### 5. **Error Analysis**
+```r
+# Analyze prediction failures
+failures <- results$per_case %>%
+  filter(is.na(rank_hit)) %>%  # Target not in top-K
+  select(input_text, target, pred1, pred2, pred3, source) %>%
+  head(20)
+
+# Common patterns:
+# - Rare words (low frequency in training)
+# - Context-dependent idioms
+# - Source-specific vocabulary (Twitter slang vs news)
+```
+
+### **What is Accuracy@k?** 📊
+
+**Accuracy@k** is the standard evaluation metric for next-word prediction systems (keyboards, autocomplete, etc.):
+
+- **Accuracy@1**: Percentage of times the correct word is THE top prediction
+  - Most stringent metric
+  - Example: User must accept suggestion without looking
+  
+- **Accuracy@3**: Percentage of times correct word is in top-3 suggestions
+  - Practical for mobile keyboards (typically show 3 suggestions)
+  - Industry standard benchmark
+  
+- **Accuracy@5**: Percentage of times correct word is in top-5
+  - More lenient, suitable for desktop autocomplete
+  - Better coverage but requires more user scanning
+
+**Why it matters:**
+- Mobile keyboards show 3 suggestions → Accuracy@3 is key metric
+- Higher accuracy = fewer keystrokes = better user experience
+- Latency matters too: predictions must be <50ms (p95) for real-time typing
+
+**Typical benchmarks:**
+- Good model: Accuracy@3 ≈ 30-40%
+- State-of-the-art: Accuracy@3 ≈ 50-60% (with neural models)
+- Your mileage may vary (depends on corpus, domain, model size)
+
 ## Package Structure 📦
 
 ```
@@ -174,6 +289,13 @@ rcaptext/
 ### Text Prediction 🆕
 - `extract_last_tokens()` - Extract context words from user input
 - `predict_next()` - Predict next word with Stupid Backoff algorithm
+
+### ML Pipeline & Evaluation 🔬
+- `split_corpus()` - Stratified train/test split by source
+- `make_test_trigrams()` - Generate (context → target) test cases
+- `build_model()` - End-to-end pipeline: clean → tokenize → build → prune → save
+- `evaluate_accuracy_at_k()` - Measure accuracy@k and prediction latency
+- `get_pred_vec()` - Helper for batch predictions (internal)
 
 ### Visualization
 - `plot_top_terms()` - Bar plot of most frequent terms
