@@ -3,10 +3,15 @@
 #' This function performs comprehensive text cleaning and normalization,
 #' including URL removal, social media cleanup, and character standardization.
 #' It's specifically designed for preprocessing social media and web text data.
+#' Uses parallel processing for large text vectors.
 #'
 #' @param x Character vector. Input text to be cleaned.
 #' @param keep_hashtag_word Logical. If TRUE, removes the '#' symbol but keeps
 #'   the hashtag word. If FALSE, removes hashtags entirely. Default is TRUE.
+#' @param n_cores Integer. Number of CPU cores to use for parallel processing.
+#'   Default is NULL (uses parallel::detectCores() - 4). Set to 1 for sequential processing.
+#' @param parallel_threshold Integer. Minimum number of text items to trigger
+#'   parallel processing. Default is 1000. Smaller datasets are processed sequentially.
 #'
 #' @return Character vector of the same length as input, with cleaned text.
 #'
@@ -23,6 +28,9 @@
 #'   \item Trim leading/trailing spaces
 #' }
 #'
+#' For large text vectors (>= parallel_threshold), the function automatically
+#' uses parallel processing to speed up computation.
+#'
 #' @examples
 #' \dontrun{
 #' # Basic text cleaning
@@ -35,26 +43,58 @@
 #' 
 #' # Remove hashtag words entirely
 #' clean_text(dirty_text, keep_hashtag_word = FALSE)
+#' 
+#' # Force sequential processing
+#' clean_text(dirty_text, n_cores = 1)
 #' }
 #'
 #' @export
 #' @importFrom stringr str_to_lower str_replace_all str_trim
-clean_text <- function(x, keep_hashtag_word = TRUE) {
-  x |>
-    stringr::str_to_lower() |>
-    # Remove URLs
-    stringr::str_replace_all("https?://\\S+|www\\.\\S+", " ") |>
-    # Remove @mentions
-    stringr::str_replace_all("@\\w+", " ") |>
-    # Handle hashtags: remove # but keep word, or remove entirely
-    stringr::str_replace_all("#\\w+", " ")  |>
-    # Remove non-ASCII characters (emojis, etc.)
-    stringr::str_replace_all("[^\\x01-\\x7F]", " ") |>
-    # Keep only letters, apostrophes and spaces; remove numbers, punctuation
-    stringr::str_replace_all("[^a-z' ]", " ") |>
-    # Collapse multiple spaces
-    stringr::str_replace_all("\\s+", " ") |>
-    stringr::str_trim()
+#' @importFrom parallel makeCluster stopCluster parLapply clusterEvalQ detectCores
+clean_text <- function(x, keep_hashtag_word = TRUE, n_cores = NULL, parallel_threshold = 1000) {
+  n <- length(x)
+  
+  # Function to clean a single text or chunk
+  clean_fn <- function(text) {
+    text |>
+      stringr::str_to_lower() |>
+      # Remove URLs
+      stringr::str_replace_all("https?://\\S+|www\\.\\S+", " ") |>
+      # Remove @mentions
+      stringr::str_replace_all("@\\w+", " ") |>
+      # Handle hashtags: remove # but keep word, or remove entirely
+      stringr::str_replace_all("#\\w+", " ")  |>
+      # Remove non-ASCII characters (emojis, etc.)
+      stringr::str_replace_all("[^\\x01-\\x7F]", " ") |>
+      # Keep only letters, apostrophes and spaces; remove numbers, punctuation
+      stringr::str_replace_all("[^a-z' ]", " ") |>
+      # Collapse multiple spaces
+      stringr::str_replace_all("\\s+", " ") |>
+      stringr::str_trim()
+  }
+  
+  # Use parallel processing for large vectors
+  if (n >= parallel_threshold) {
+    if (is.null(n_cores)) {
+      n_cores <- max(1, parallel::detectCores() - 4)
+    }
+    
+    if (n_cores > 1) {
+      cl <- parallel::makeCluster(n_cores)
+      on.exit(parallel::stopCluster(cl), add = TRUE)
+      
+      # Export stringr functions to cluster
+      parallel::clusterEvalQ(cl, {
+        library(stringr)
+      })
+      
+      result <- unlist(parallel::parLapply(cl, x, clean_fn))
+      return(result)
+    }
+  }
+  
+  # Sequential processing for small vectors or n_cores = 1
+  clean_fn(x)
 }
 
 #' Detect Non-English Words
@@ -62,10 +102,15 @@ clean_text <- function(x, keep_hashtag_word = TRUE) {
 #' This function uses hunspell dictionary to identify words that are likely
 #' not English. It's useful for filtering multilingual corpora or detecting
 #' foreign language content in predominantly English text.
+#' Uses parallel processing for large word vectors.
 #'
 #' @param words Character vector. Words to check (should be in lowercase).
 #' @param dict Character or hunspell dictionary object. Dictionary to use for
 #'   spell checking. Default is "en_US".
+#' @param n_cores Integer. Number of CPU cores to use for parallel processing.
+#'   Default is NULL (uses parallel::detectCores() - 4). Set to 1 for sequential processing.
+#' @param parallel_threshold Integer. Minimum number of words to trigger
+#'   parallel processing. Default is 5000.
 #'
 #' @return Logical vector of same length as \code{words}: TRUE indicates
 #'   the word is probably non-English or misspelled.
@@ -79,6 +124,8 @@ clean_text <- function(x, keep_hashtag_word = TRUE) {
 #'   \item Uses hunspell for spell checking remaining tokens
 #' }
 #'
+#' For large word vectors, the function automatically uses parallel processing.
+#'
 #' @examples
 #' \dontrun{
 #' # Check various words
@@ -87,19 +134,58 @@ clean_text <- function(x, keep_hashtag_word = TRUE) {
 #' 
 #' # Use different dictionary
 #' flag_non_english(c("colour", "color"), dict = "en_GB")
+#' 
+#' # Force sequential processing
+#' flag_non_english(test_words, n_cores = 1)
 #' }
 #'
 #' @export
 #' @importFrom stringr str_detect
 #' @importFrom hunspell hunspell_check
-flag_non_english <- function(words, dict = "en_US") {
+#' @importFrom parallel makeCluster stopCluster parLapply clusterEvalQ detectCores
+flag_non_english <- function(words, dict = "en_US", n_cores = NULL, parallel_threshold = 5000) {
   # Pattern for "English word": very permissive: letters + apostrophe
   is_alpha <- stringr::str_detect(words, "^[a-z']+$")
   res <- logical(length(words))
   res[!is_alpha] <- TRUE  # numbers/symbols → non-english for vocabulary purposes
   
   if (any(is_alpha)) {
-    ok <- hunspell::hunspell_check(words[is_alpha], dict = dict)
+    alpha_words <- words[is_alpha]
+    n_alpha <- length(alpha_words)
+    
+    # Use parallel processing for large word lists
+    if (n_alpha >= parallel_threshold) {
+      if (is.null(n_cores)) {
+        n_cores <- max(1, parallel::detectCores() - 4)
+      }
+      
+      if (n_cores > 1) {
+        cl <- parallel::makeCluster(n_cores)
+        on.exit(parallel::stopCluster(cl), add = TRUE)
+        
+        # Export hunspell to cluster
+        parallel::clusterEvalQ(cl, {
+          library(hunspell)
+        })
+        
+        # Split words into chunks for each core
+        chunk_size <- ceiling(n_alpha / n_cores)
+        chunks <- split(alpha_words, ceiling(seq_along(alpha_words) / chunk_size))
+        
+        # Check each chunk in parallel
+        ok_list <- parallel::parLapply(cl, chunks, function(chunk) {
+          hunspell::hunspell_check(chunk, dict = dict)
+        })
+        
+        ok <- unlist(ok_list)
+      } else {
+        ok <- hunspell::hunspell_check(alpha_words, dict = dict)
+      }
+    } else {
+      # Sequential processing for small word lists
+      ok <- hunspell::hunspell_check(alpha_words, dict = dict)
+    }
+    
     res[is_alpha] <- !ok
   }
   res
@@ -109,6 +195,7 @@ flag_non_english <- function(words, dict = "en_US") {
 #'
 #' This function removes likely non-English words from a unigram frequency table,
 #' with options to preserve common stopwords and handle short tokens.
+#' Uses parallel processing for large vocabularies.
 #'
 #' @param freq_uni A tibble with columns \code{word}, \code{n}, and \code{p}.
 #'   Typically output from \code{\link{freq_unigrams}}.
@@ -118,6 +205,10 @@ flag_non_english <- function(words, dict = "en_US") {
 #'   this are automatically removed. Default is 2.
 #' @param keep_stopwords Logical. If TRUE, preserves standard English stopwords
 #'   even if flagged by spell checker. Default is TRUE.
+#' @param n_cores Integer. Number of CPU cores to use for parallel processing.
+#'   Default is NULL (auto-detect). Set to 1 for sequential processing.
+#' @param parallel_threshold Integer. Minimum vocabulary size to trigger
+#'   parallel processing. Default is 5000.
 #'
 #' @return A filtered tibble with the same structure as input, but with
 #'   non-English words removed and frequencies re-normalized.
@@ -152,12 +243,17 @@ flag_non_english <- function(words, dict = "en_US") {
 #'   min_len = 3, 
 #'   keep_stopwords = FALSE
 #' )
+#' 
+#' # Force sequential processing
+#' seq_freq <- filter_non_english_unigrams(freq_table, n_cores = 1)
 #' }
 #'
 #' @export
 #' @importFrom dplyr mutate filter
 #' @importFrom stringr str_replace_all
-filter_non_english_unigrams <- function(freq_uni, dict = "en_US", min_len = 2, keep_stopwords = TRUE) {
+filter_non_english_unigrams <- function(freq_uni, dict = "en_US", min_len = 2, 
+                                        keep_stopwords = TRUE, n_cores = NULL, 
+                                        parallel_threshold = 5000) {
   stopifnot(all(c("word","n","p") %in% names(freq_uni)))
   
   tbl <- freq_uni |>
@@ -178,7 +274,9 @@ filter_non_english_unigrams <- function(freq_uni, dict = "en_US", min_len = 2, k
   flag_ne <- logical(nrow(tbl))
   idx <- which(!tbl$is_short & !keep_sw)
   if (length(idx)) {
-    flag_ne[idx] <- flag_non_english(tbl$word[idx], dict = dict)
+    flag_ne[idx] <- flag_non_english(tbl$word[idx], dict = dict, 
+                                     n_cores = n_cores, 
+                                     parallel_threshold = parallel_threshold)
   }
   
   out <- tbl |>

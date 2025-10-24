@@ -4,13 +4,24 @@
 \alias{clean_text}
 \title{Clean and Normalize Text Data}
 \usage{
-clean_text(x, keep_hashtag_word = TRUE)
+clean_text(
+  x,
+  keep_hashtag_word = TRUE,
+  n_cores = NULL,
+  parallel_threshold = 1000
+)
 }
 \arguments{
 \item{x}{Character vector. Input text to be cleaned.}
 
 \item{keep_hashtag_word}{Logical. If TRUE, removes the '#' symbol but keeps
 the hashtag word. If FALSE, removes hashtags entirely. Default is TRUE.}
+
+\item{n_cores}{Integer. Number of CPU cores to use for parallel processing.
+Default is NULL (uses parallel::detectCores() - 4). Set to 1 for sequential processing.}
+
+\item{parallel_threshold}{Integer. Minimum number of text items to trigger
+parallel processing. Default is 1000. Smaller datasets are processed sequentially.}
 }
 \value{
 Character vector of the same length as input, with cleaned text.
@@ -19,6 +30,7 @@ Character vector of the same length as input, with cleaned text.
 This function performs comprehensive text cleaning and normalization,
 including URL removal, social media cleanup, and character standardization.
 It's specifically designed for preprocessing social media and web text data.
+Uses parallel processing for large text vectors.
 }
 \details{
 The cleaning process includes:
@@ -32,6 +44,9 @@ The cleaning process includes:
   \item Normalize whitespace
   \item Trim leading/trailing spaces
 }
+
+For large text vectors (>= parallel_threshold), the function automatically
+uses parallel processing to speed up computation.
 }
 \examples{
 \dontrun{
@@ -45,6 +60,9 @@ clean_text(dirty_text)
 
 # Remove hashtag words entirely
 clean_text(dirty_text, keep_hashtag_word = FALSE)
+
+# Force sequential processing
+clean_text(dirty_text, n_cores = 1)
 }
 
 }

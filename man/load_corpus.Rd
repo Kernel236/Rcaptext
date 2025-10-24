@@ -4,12 +4,15 @@
 \alias{load_corpus}
 \title{Load SwiftKey Text Corpus}
 \usage{
-load_corpus(lang = "en_US", base_dir = "data/raw")
+load_corpus(lang = "en_US", base_dir = "data/raw", n_cores = NULL)
 }
 \arguments{
 \item{lang}{Character. Language code prefix (e.g. "en_US", "de_DE"). Default is "en_US".}
 
 \item{base_dir}{Character. Directory where raw data are stored. Default is "data/raw".}
+
+\item{n_cores}{Integer. Number of CPU cores for parallel file reading.
+Default is NULL (uses parallel::detectCores() - 4). Set to 1 for sequential processing.}
 }
 \value{
 A tibble with columns: 

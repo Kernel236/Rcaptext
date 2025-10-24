@@ -7,6 +7,8 @@
 #'
 #' @param lang Character. Language code prefix (e.g. "en_US", "de_DE"). Default is "en_US".
 #' @param base_dir Character. Directory where raw data are stored. Default is "data/raw".
+#' @param n_cores Integer. Number of CPU cores for parallel file reading.
+#'   Default is NULL (uses parallel::detectCores() - 4). Set to 1 for sequential processing.
 #'
 #' @return A tibble with columns: 
 #'   \describe{
@@ -35,8 +37,8 @@
 #' @importFrom here here
 #' @importFrom readr read_lines
 #' @importFrom tibble tibble
-#' @importFrom parallel makeCluster clusterEvalQ parLapply stopCluster
-load_corpus <- function(lang = "en_US", base_dir = "data/raw") {
+#' @importFrom parallel makeCluster clusterEvalQ parLapply stopCluster detectCores
+load_corpus <- function(lang = "en_US", base_dir = "data/raw", n_cores = NULL) {
   
   # Build file paths (standard SwiftKey filenames)
   f_blogs   <- here::here(base_dir, sprintf("%s.blogs.txt",   lang))
@@ -60,10 +62,15 @@ load_corpus <- function(lang = "en_US", base_dir = "data/raw") {
   message(sprintf("  - blogs:   %s", f_blogs))
   message(sprintf("  - news:    %s", f_news))
   message(sprintf("  - twitter: %s", f_twitter))
-  message("• Setting up parallel processing with 8 cores...")
+  
+  # Determine number of cores
+  if (is.null(n_cores)) {
+    n_cores <- max(1, parallel::detectCores() - 4)
+  }
+  message(sprintf("• Setting up parallel processing with %d cores...", n_cores))
   
   # --- Setup parallel processing ---
-  cl <- parallel::makeCluster(8)
+  cl <- parallel::makeCluster(n_cores)
   on.exit(parallel::stopCluster(cl))  # Ensure cluster is closed even if function fails
   
   # Load required packages on cluster nodes

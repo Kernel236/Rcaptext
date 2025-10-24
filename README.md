@@ -20,6 +20,7 @@ A modest collection of R functions for text analysis, born from the ashes of my 
 - **Builds language models** - n-gram models with conditional probabilities
 - **Predicts text** - next word prediction with Stupid Backoff
 - **Makes pretty plots** - to impress supervisors and committees
+- **Parallel processing** ⚡ - automatic multi-core support for heavy operations
 
 ## Installation 🚀
 
@@ -41,7 +42,7 @@ corpus <- load_corpus("en_US", base_dir = "data/raw")
 sample_data <- sample_corpus(corpus, prop = 0.05, seed = 42)
 
 # 3. Clean the text (goodbye junk)
-sample_data$text <- clean_text(sample_data$text)
+sample_data$text <- clean_text(sample_data$text)  # Automatically uses parallel processing for large datasets
 
 # 4. Tokenize
 unigrams <- tokenize_unigrams(sample_data)
@@ -158,6 +159,30 @@ The package relies on giants like:
 - Documentation written in a hurry
 - Might have bugs (feedback welcome!)
 - I guarantee nothing 🤷‍♂️
+
+## Performance ⚡
+
+The package automatically uses **parallel processing** for computationally intensive operations:
+
+- **`load_corpus()`** - Multi-core file reading
+- **`clean_text()`** - Parallel text cleaning for vectors >= 1000 items
+- **`flag_non_english()`** - Parallel spell checking for vocabularies >= 5000 words  
+- **`filter_non_english_unigrams()`** - Parallel filtering of large frequency tables
+
+By default, the package uses `detectCores() - 4` cores to leave plenty of resources for the system and other applications. You can control this with the `n_cores` parameter:
+
+```r
+# Force sequential processing
+clean_text(corpus$text, n_cores = 1)
+
+# Use specific number of cores
+clean_text(corpus$text, n_cores = 4)
+
+# Auto-detect (default)
+clean_text(corpus$text)  # Uses all available cores - 4
+```
+
+For small datasets, operations run sequentially to avoid parallelization overhead.
 
 ## Contributing 🤝
 
