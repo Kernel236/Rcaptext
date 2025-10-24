@@ -74,7 +74,8 @@ extract_last_tokens <- function(input, k = 2) {
 #'   }
 #' @param uni_lookup Data frame. Unigram model containing columns:
 #'   \itemize{
-#'     \item \code{next}: Word (character)
+#'     \item \code{word}: Word (character)
+#'     \item \code{n}: Frequency count (numeric)
 #'     \item \code{p}: Marginal probability (numeric)
 #'   }
 #' @param alpha Numeric. Backoff penalty factor (default: 0.4). Applied as:
@@ -148,7 +149,7 @@ predict_next <- function(input, tri_pruned, bi_pruned, uni_lookup,
   if (length(last2) == 0) {
     return(
       uni_lookup %>%
-        dplyr::transmute(word = next, score = (alpha^2) * p, source = "unigram") %>%
+        dplyr::transmute(word = word, score = (alpha^2) * p, source = "unigram") %>%
         dplyr::arrange(dplyr::desc(score)) %>%
         dplyr::slice_head(n = top_k)
     )
@@ -174,7 +175,7 @@ predict_next <- function(input, tri_pruned, bi_pruned, uni_lookup,
 
   # 3) UNIGRAM fallback with alpha^2
   uni_cand <- uni_lookup %>%
-    dplyr::transmute(word = next, score = (alpha^2) * p, source = "unigram")
+    dplyr::transmute(word = word, score = (alpha^2) * p, source = "unigram")
 
   # 4) Combine, deduplicate by best score, rank and top-k
   dplyr::bind_rows(tri_cand, bi_cand, uni_cand) %>%

@@ -60,7 +60,7 @@ Directory is created if it doesn't exist.}
 \value{
 A list containing the complete language model:
   \itemize{
-    \item \code{uni_lookup}: Unigram lookup table with columns 'next' and 'p' for fallback predictions
+    \item \code{uni_lookup}: Unigram lookup table with columns 'word', 'n', and 'p' for fallback predictions
     \item \code{bi_pruned}: Pruned bigram model with columns w1, w2, n, p_cond
     \item \code{tri_pruned}: Pruned trigram model with columns w1, w2, w3, n, p_cond  
     \item \code{meta}: Metadata including timestamp, parameters, and size statistics

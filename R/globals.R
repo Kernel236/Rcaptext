@@ -16,6 +16,5 @@ utils::globalVariables(c(
   ".data",
   # Language modeling variables
   "p_cond",     # conditional probability
-  "next",       # unigram lookup column
   "score"       # prediction score
 ))

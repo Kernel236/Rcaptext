@@ -129,7 +129,7 @@ build_cond_trigram <- function(freq_tri) {
 #'
 #' @return A list containing the complete language model:
 #'   \itemize{
-#'     \item \code{uni_lookup}: Unigram lookup table with columns 'next' and 'p' for fallback predictions
+#'     \item \code{uni_lookup}: Unigram lookup table with columns 'word', 'n', and 'p' for fallback predictions
 #'     \item \code{bi_pruned}: Pruned bigram model with columns w1, w2, n, p_cond
 #'     \item \code{tri_pruned}: Pruned trigram model with columns w1, w2, w3, n, p_cond  
 #'     \item \code{meta}: Metadata including timestamp, parameters, and size statistics
@@ -185,9 +185,8 @@ build_pruned_lang_model <- function(freq_uni, freq_bi, freq_tri,
   bi_pruned <- prune_topN_per_history(bi_min,  history_cols = c("w1"),     target_col = p_cond, N = topN_bi)
   tri_pruned <- prune_topN_per_history(tri_min, history_cols = c("w1","w2"), target_col = p_cond, N = topN_tri)
 
-  # 4) unigram lookup (fallback): next = word, p = marginal prob
+  # 4) unigram lookup (fallback): keep word, n, p columns
   uni_lookup <- freq_uni
-  names(uni_lookup)[names(uni_lookup) == "word"] <- "next"
 
   # meta info
   meta <- list(

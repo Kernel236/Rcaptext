@@ -27,7 +27,8 @@ Will be cleaned and tokenized automatically using \code{extract_last_tokens}.}
 
 \item{uni_lookup}{Data frame. Unigram model containing columns:
 \itemize{
-  \item \code{next}: Word (character)
+  \item \code{word}: Word (character)
+  \item \code{n}: Frequency count (numeric)
   \item \code{p}: Marginal probability (numeric)
 }}
 
