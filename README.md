@@ -212,6 +212,27 @@ failures <- results$per_case %>%
 # - Source-specific vocabulary (Twitter slang vs news)
 ```
 
+### 6. **Quick Performance Report** 📊
+```r
+# One-line function for complete analysis
+perf <- summarise_and_plot_eval(results)
+# Prints tables + displays 3 plots:
+# - Accuracy@k bar chart
+# - Rank hit distribution
+# - Latency summary (mean/p50/p95)
+
+# Or build custom reports
+perf_tables <- build_performance_tables(results)
+print(perf_tables$accuracy)        # Formatted with percentages
+print(perf_tables$hit_breakdown)   # Top-1 vs top-K hits
+print(perf_tables$timing)          # Latency stats
+
+# Individual plots
+plot_accuracy_bars(results$accuracy)
+plot_rank_hit_distribution(results$per_case)
+plot_latency_summary(results$timing)
+```
+
 ### **What is Accuracy@k?** 📊
 
 **Accuracy@k** is the standard evaluation metric for next-word prediction systems (keyboards, autocomplete, etc.):
@@ -246,6 +267,7 @@ Rcaptext/
 │   ├── test_trigrams.R       # Test case generation
 │   ├── build_model.R         # End-to-end model pipeline
 │   ├── accuracy_evaluation.R # Accuracy@k metrics & timing
+│   ├── performance.R         # Performance analysis & reporting 🆕
 │   ├── visualization.R       # Plotting functions
 │   ├── globals.R             # Global variable declarations
 │   └── rcaptext-package.R    # Package documentation
@@ -293,6 +315,14 @@ Rcaptext/
 - `build_model()` - End-to-end pipeline: clean → tokenize → build → prune → save
 - `evaluate_accuracy_at_k()` - Measure accuracy@k and prediction latency
 - `get_pred_vec()` - Helper for batch predictions (internal)
+
+### Performance Analysis & Reporting 📈
+- `format_accuracy_table()` - Format accuracy values as percentages
+- `build_performance_tables()` - Extract comprehensive metrics (accuracy, timing, hit breakdown)
+- `plot_accuracy_bars()` - Bar chart of accuracy@k
+- `plot_rank_hit_distribution()` - Visualize where correct word appears in predictions
+- `plot_latency_summary()` - Plot mean/p50/p95 prediction latency
+- `summarise_and_plot_eval()` - One-line function for complete performance report
 
 ### Visualization
 - `plot_top_terms()` - Bar plot of most frequent terms
