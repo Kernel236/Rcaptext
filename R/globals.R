@@ -23,6 +23,17 @@ utils::globalVariables(c(
   ".wc",        # word count column in test case generation
   "input_text", # input context for test cases
   "target",     # target word for test cases
-  # Accuracy evaluation variables (model_accuracy@k.R)
-  "rank_hit"    # hit rank in accuracy evaluation
+  # Accuracy evaluation variables (accuracy_evaluation.R, performance.R)
+  "rank_hit",   # hit rank in accuracy evaluation
+  "hit_k",      # binary hit indicator at specific k
+  "hit_any",    # hit in any top-K position
+  "hit_top1",   # hit at top-1 position
+  # Performance/timing variables
+  "mean_ms",    # mean latency in milliseconds
+  "p50_ms",     # median latency (p50)
+  "p95_ms",     # 95th percentile latency
+  "stat",       # statistic name in pivot_longer
+  "ms",         # milliseconds value
+  "p",          # proportion/percentage
+  "k"           # k value for accuracy@k
 ))

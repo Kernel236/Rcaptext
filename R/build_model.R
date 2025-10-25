@@ -164,12 +164,20 @@ build_model <- function(train_corpus,
   uni <- tokenize_unigrams(train_corpus, text_col = !!rlang::sym(text_col))
   bi  <- tokenize_bigrams(train_corpus,  text_col = !!rlang::sym(text_col))
   tri <- tokenize_trigrams(train_corpus, text_col = !!rlang::sym(text_col))
+  
+  # Free memory: train_corpus no longer needed after tokenization
+  rm(train_corpus)
+  gc(verbose = FALSE)
 
   # ---- Frequencies ----
   message(">> Computing frequency tables")
   freq_uni <- freq_unigrams(uni)   # word, n, p
   freq_bi  <- freq_bigrams(bi)     # w1, w2, n, p
   freq_tri <- freq_trigrams(tri)   # w1, w2, w3, n, p
+  
+  # Free memory: tokenized data no longer needed after frequency computation
+  rm(uni, bi, tri)
+  gc(verbose = FALSE)
 
   # ---- Optional OOV/foreign filter on unigrams ----
   if (isTRUE(oov_filter)) {
@@ -201,6 +209,12 @@ build_model <- function(train_corpus,
     save     = save,
     out_dir  = out_dir
   )
+  
+  # Free memory: frequency tables no longer needed unless return_freq=TRUE
+  if (!isTRUE(return_freq)) {
+    rm(freq_uni, freq_bi, freq_tri)
+    gc(verbose = FALSE)
+  }
 
   message(">> Model built successfully! Sizes (before/after pruning):")
   print(lang_model$meta$sizes)

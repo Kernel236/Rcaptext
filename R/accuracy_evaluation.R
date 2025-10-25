@@ -157,6 +157,10 @@ evaluate_accuracy_at_k <- function(
     }, per_case$target, split(per_case[paste0("pred", seq_len(Kmax))], seq_len(nrow(per_case))) )
     dplyr::tibble(k = k, accuracy = mean(hits_k, na.rm = TRUE))
   }) %>% dplyr::bind_rows()
+  
+  # Free memory: pred_list and pred_mat no longer needed
+  rm(pred_list, pred_mat)
+  gc(verbose = FALSE)
 
   # ---- Optional: Measure prediction latency ----
   timing_tbl <- NULL
