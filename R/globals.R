@@ -35,12 +35,5 @@ utils::globalVariables(c(
   "stat",       # statistic name in pivot_longer
   "ms",         # milliseconds value
   "p",          # proportion/percentage
-  "k",          # k value for accuracy@k
-  # Perplexity variables
-  "scope",      # perplexity scope (doc/corpus)
-  "mean_logp",  # mean log probability
-  "perplexity", # perplexity metric
-  "N",          # number of tokens
-  "model_id",   # model identifier
-  "accuracy"    # accuracy metric
+  "k"           # k value for accuracy@k
 ))
