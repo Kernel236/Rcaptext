@@ -134,10 +134,14 @@ evaluate_accuracy_at_k <- function(
     }
 
     # ---- Generate per-case predictions ----
-    pred_list <- lapply(seq_len(nrow(test_windows)), function(i) {
+    # Adaptive progress: update every 1% or every 1000 cases, whichever is smaller
+    n_cases <- nrow(test_windows)
+    progress_interval <- min(1000, max(10, ceiling(n_cases / 100)))
+    
+    pred_list <- lapply(seq_len(n_cases), function(i) {
       if (use_progress) {
-        if (i %% 10000 == 0 || i == nrow(test_windows)) {
-          p(sprintf("predict %d/%d", i, nrow(test_windows)))
+        if (i %% progress_interval == 0 || i == n_cases) {
+          p(sprintf("predict %d/%d", i, n_cases))
         }
       }
       x <- test_windows$input_text[i]
@@ -185,9 +189,12 @@ evaluate_accuracy_at_k <- function(
       idx <- sample.int(nrow(test_windows), size = min(timing_n, nrow(test_windows)))
       t_ms <- numeric(length(idx))
       
+      # Adaptive progress: update every 10 cases or every 5%, whichever is larger
+      timing_interval <- max(10, ceiling(length(idx) / 20))
+      
       for (j in seq_along(idx)) {
         if (use_progress) {
-          if (j %% 50 == 0 || j == length(idx)) {
+          if (j %% timing_interval == 0 || j == length(idx)) {
             p(sprintf("timing %d/%d", j, length(idx)))
           }
         }
