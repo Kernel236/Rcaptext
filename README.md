@@ -123,6 +123,44 @@ predict_next("I love", tri_pruned, bi_pruned, uni_lookup,
 
 The `alpha` parameter (default 0.4) penalizes lower-order models, giving preference to higher-order n-grams when available.
 
+### 4. **Advanced Prediction Methods** 🚀
+
+The package now includes **multiple prediction algorithms** for different use cases:
+
+#### **Stupid Backoff** (Default)
+```r
+# Fast, simple backoff with fixed penalty
+predictions <- predict_next("I love", tri_pruned, bi_pruned, uni_lookup, 
+                           alpha = 0.4)
+```
+
+#### **Linear Interpolation** (Smoother)
+```r
+# Weighted combination of all n-gram orders
+predictions <- predict_interpolated("I love", tri_pruned, bi_pruned, uni_lookup,
+                                   lambda1 = 0.6, lambda2 = 0.3, lambda3 = 0.1)
+# λ₁ × P(w₃|w₁,w₂) + λ₂ × P(w₃|w₂) + λ₃ × P(w₃)
+```
+
+#### **Performance Optimization**
+```r
+# Create LRU cache for repeated predictions
+cache <- create_lru_cache(max_size = 1000)
+
+# Timed prediction with caching
+result <- timed_predict("I love", tri_pruned, bi_pruned, uni_lookup,
+                       cache = cache, method = "interpolated")
+# Returns: list(predictions = ..., time_ms = 12.3)
+
+# Compare methods
+comparison <- benchmark_methods(
+  test_cases = c("I love", "the quick", "how are"),
+  tri_pruned = tri_pruned, bi_pruned = bi_pruned, uni_lookup = uni_lookup,
+  n_runs = 100
+)
+# Shows accuracy and speed comparison: Stupid Backoff vs Interpolation
+```
+
 ## ML Pipeline & Model Evaluation 🔬
 
 The package includes a complete **machine learning pipeline** for training and evaluating next-word prediction models:
@@ -256,18 +294,18 @@ plot_latency_summary(results$timing)
 Rcaptext/
 ├── R/
 │   ├── corpus.R              # Load & sample corpora
-│   ├── tokenization.R        # N-gram tokenization
+│   ├── tokenization.R        # N-gram tokenization  
 │   ├── text_cleaning.R       # Text normalization & filtering
 │   ├── frequency.R           # N-gram frequency computation
-│   ├── coverage.R            # Coverage statistics
+│   ├── coverage.R            # Coverage statistics & TF-IDF
 │   ├── language_modeling.R   # Conditional probability models
 │   ├── pruning.R             # Model pruning utilities
-│   ├── prediction.R          # Next-word prediction (Stupid Backoff)
+│   ├── prediction.R          # Next-word prediction (Stupid Backoff + Interpolation) 🔥
 │   ├── split_corpus.R        # Train/test splitting
 │   ├── test_trigrams.R       # Test case generation
 │   ├── build_model.R         # End-to-end model pipeline
 │   ├── accuracy_evaluation.R # Accuracy@k metrics & timing
-│   ├── performance.R         # Performance analysis & reporting 🆕
+│   ├── performance.R         # Performance analysis, caching & benchmarking 🆕
 │   ├── visualization.R       # Plotting functions
 │   ├── globals.R             # Global variable declarations
 │   └── rcaptext-package.R    # Package documentation
@@ -294,20 +332,24 @@ Rcaptext/
 ### Frequency Analysis
 - `freq_unigrams()` - Count single words
 - `freq_bigrams()` - Count word pairs
-- `freq_trigrams()` - Count word triplets
+- `freq_trigrams()` - Count word triplets  
 - `freq_ngrams()` - Generic n-gram frequencies
 - `coverage_from_freq()` - Coverage analysis for vocabulary
+- `build_idf_lookup()` - Compute TF-IDF weights for document-term importance
 
 ### Language Modeling 🆕
 - `build_cond_bigram()` - Compute P(w2 | w1) conditional probabilities with MLE
 - `build_cond_trigram()` - Compute P(w3 | w1, w2) conditional probabilities with MLE
 - `build_pruned_lang_model()` - Build complete pruned n-gram language model
+- `build_idf_lookup()` - Build TF-IDF lookup table for document importance weighting
 - `prune_by_min_count()` - Remove rare n-grams by frequency threshold
 - `prune_topN_per_history()` - Keep only top-N continuations per context
 
 ### Text Prediction 🆕
 - `extract_last_tokens()` - Extract context words from user input
 - `predict_next()` - Predict next word with Stupid Backoff algorithm
+- `predict_interpolated()` - Advanced prediction with linear interpolation smoothing
+- `timed_predict()` - Time-aware prediction wrapper for performance analysis
 
 ### ML Pipeline & Evaluation 🔬
 - `split_corpus()` - Stratified train/test split by source
@@ -319,6 +361,8 @@ Rcaptext/
 ### Performance Analysis & Reporting 📈
 - `format_accuracy_table()` - Format accuracy values as percentages
 - `build_performance_tables()` - Extract comprehensive metrics (accuracy, timing, hit breakdown)
+- `benchmark_methods()` - Compare prediction algorithms (Stupid Backoff vs Interpolation)
+- `create_lru_cache()` - Create LRU (Least Recently Used) cache for prediction optimization
 - `plot_accuracy_bars()` - Bar chart of accuracy@k
 - `plot_rank_hit_distribution()` - Visualize where correct word appears in predictions
 - `plot_latency_summary()` - Plot mean/p50/p95 prediction latency
