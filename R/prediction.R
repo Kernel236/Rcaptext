@@ -183,11 +183,31 @@ predict_next <- function(input, tri_pruned, bi_pruned, uni_lookup,
     dplyr::filter(.data$w1 == !!last1) %>%
     dplyr::transmute(word = .data$w2, score = alpha * .data$p_cond, source = "bigram")
 
-  # 3) UNIGRAM fallback (use pre-computed version)
-  uni_cand <- uni_fallback
-
-  # 4) Combine, deduplicate by best score, rank and top-k
-  dplyr::bind_rows(tri_cand, bi_cand, uni_cand) %>%
+  # 3) UNIGRAM fallback - only take top candidates (already sorted in uni_fallback)
+  # This avoids bind_rows with 50K+ rows every time!
+  
+  # 4) Combine tri + bi first
+  all_cands <- dplyr::bind_rows(tri_cand, bi_cand)
+  
+  # Only add unigrams if needed
+  if (nrow(all_cands) == 0) {
+    # No tri/bi matches: return top-k unigrams directly
+    return(uni_fallback %>% dplyr::slice_head(n = top_k))
+  } else if (nrow(all_cands) < top_k) {
+    # Need unigrams to reach top_k: add enough from pre-sorted uni_fallback
+    # Take more than needed to account for potential duplicates
+    uni_needed <- top_k - nrow(all_cands) + 50  # +50 buffer for duplicates
+    uni_cand <- uni_fallback %>% dplyr::slice_head(n = uni_needed)
+    all_cands <- dplyr::bind_rows(all_cands, uni_cand)
+  } else {
+    # Have enough candidates, but unigrams might still rank higher
+    # Only add top unigrams that could compete
+    uni_cand <- uni_fallback %>% dplyr::slice_head(n = top_k * 2)
+    all_cands <- dplyr::bind_rows(all_cands, uni_cand)
+  }
+  
+  # Deduplicate and return top-k
+  all_cands %>%
     dplyr::group_by(.data$word) %>%
     dplyr::summarise(score = max(.data$score), source = .data$source[which.max(.data$score)], .groups = "drop") %>%
     dplyr::arrange(dplyr::desc(.data$score)) %>%

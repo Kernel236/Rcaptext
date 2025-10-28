@@ -128,12 +128,14 @@ evaluate_accuracy_at_k <- function(
   run_evaluation <- function() {
     if (use_progress) {
       cli::cli_h2("Evaluating model")
-      cli::cli_alert_info("Pre-computing unigram fallback for speed optimization...")
+      cli::cli_alert_info("Pre-computing unigram fallback (sorted by score)...")
     }
     
-    # ---- PRE-COMPUTE unigram fallback ONCE (HUGE performance boost!) ----
+    # ---- PRE-COMPUTE unigram fallback ONCE and SORT by score (HUGE performance boost!) ----
+    # This sorted version allows predict_next() to take only top-N unigrams instead of all 50K+
     uni_fallback <- uni_lookup %>%
-      dplyr::transmute(word = .data$word, score = (alpha^2) * .data$p, source = "unigram")
+      dplyr::transmute(word = .data$word, score = (alpha^2) * .data$p, source = "unigram") %>%
+      dplyr::arrange(dplyr::desc(.data$score))
     
     if (use_progress) {
       # Steps: nrow predictions + optional timing_n timings
