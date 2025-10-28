@@ -6,8 +6,8 @@
 #' @param w1 Character. First context word.
 #' @param w2 Character. Second context word.
 #' @param target Character. The target word to compute probability for.
-#' @param tri_pruned Data frame. Pruned trigram model with columns (w1, w2, w3, p_mle).
-#' @param bi_pruned Data frame. Pruned bigram model with columns (w1, w2, p_mle).
+#' @param tri_pruned Data frame. Pruned trigram model with columns (w1, w2, w3, p_cond).
+#' @param bi_pruned Data frame. Pruned bigram model with columns (w1, w2, p_cond).
 #' @param uni_lookup Data frame. Unigram lookup table with columns (word, p).
 #' @param alpha Numeric. Backoff penalty factor (default: 0.4).
 #' @param eps Numeric. Smoothing value to avoid log(0) (default: 1e-9).
@@ -23,7 +23,7 @@ token_logprob_sb <- function(w1, w2, target,
   # Trigram: P(w3|w1,w2) if exists
   p_tri <- tri_pruned %>%
     dplyr::filter(.data$w1 == !!w1, .data$w2 == !!w2, .data$w3 == !!target) %>%
-    dplyr::pull(.data$p_mle)
+    dplyr::pull(.data$p_cond)
 
   if (length(p_tri) > 0) {
     return(log(p_tri + eps))
@@ -32,7 +32,7 @@ token_logprob_sb <- function(w1, w2, target,
   # Bigram backoff: alpha * P(w2->target)
   p_bi <- bi_pruned %>%
     dplyr::filter(.data$w1 == !!w2, .data$w2 == !!target) %>%
-    dplyr::pull(.data$p_mle)
+    dplyr::pull(.data$p_cond)
 
   if (length(p_bi) > 0) {
     return(log(alpha * p_bi + eps))
@@ -53,8 +53,8 @@ token_logprob_sb <- function(w1, w2, target,
 #'
 #' @param test_windows Tibble. Test data with columns: w1, w2, target, and optionally
 #'   input_text and source. Typically from \code{\link{make_test_trigrams}}.
-#' @param tri_pruned Data frame. Pruned trigram model with columns (w1, w2, w3, p_mle).
-#' @param bi_pruned Data frame. Pruned bigram model with columns (w1, w2, p_mle).
+#' @param tri_pruned Data frame. Pruned trigram model with columns (w1, w2, w3, p_cond).
+#' @param bi_pruned Data frame. Pruned bigram model with columns (w1, w2, p_cond).
 #' @param uni_lookup Data frame. Unigram lookup table with columns (word, p).
 #' @param alpha Numeric. Backoff penalty factor (default: 0.4).
 #' @param eps Numeric. Smoothing value to avoid log(0) (default: 1e-9).

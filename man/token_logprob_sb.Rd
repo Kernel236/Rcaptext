@@ -22,9 +22,9 @@ token_logprob_sb(
 
 \item{target}{Character. The target word to compute probability for.}
 
-\item{tri_pruned}{Data frame. Pruned trigram model with columns (w1, w2, w3, p_mle).}
+\item{tri_pruned}{Data frame. Pruned trigram model with columns (w1, w2, w3, p_cond).}
 
-\item{bi_pruned}{Data frame. Pruned bigram model with columns (w1, w2, p_mle).}
+\item{bi_pruned}{Data frame. Pruned bigram model with columns (w1, w2, p_cond).}
 
 \item{uni_lookup}{Data frame. Unigram lookup table with columns (word, p).}
 

@@ -17,7 +17,6 @@ utils::globalVariables(c(
   # Language modeling variables
   "p_cond",     # conditional probability
   "score",      # prediction score
-  "p_mle",      # MLE probability (perplexity)
   # ML pipeline variables (make_test_trigrams.R)
   ".row_id",    # row identifier for train/test split
   ".text",      # temporary text column in test case generation

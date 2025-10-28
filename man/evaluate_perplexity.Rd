@@ -19,9 +19,9 @@ evaluate_perplexity(
 \item{test_windows}{Tibble. Test data with columns: w1, w2, target, and optionally
 input_text and source. Typically from \code{\link{make_test_trigrams}}.}
 
-\item{tri_pruned}{Data frame. Pruned trigram model with columns (w1, w2, w3, p_mle).}
+\item{tri_pruned}{Data frame. Pruned trigram model with columns (w1, w2, w3, p_cond).}
 
-\item{bi_pruned}{Data frame. Pruned bigram model with columns (w1, w2, p_mle).}
+\item{bi_pruned}{Data frame. Pruned bigram model with columns (w1, w2, p_cond).}
 
 \item{uni_lookup}{Data frame. Unigram lookup table with columns (word, p).}
 
