@@ -60,7 +60,7 @@ load_corpus <- function(lang = "en_US", base_dir = "data/raw", n_cores = NULL) {
   }
   
   # --- Informative messages for console log ---
-  message(sprintf("• Loading corpus language: %s", lang))
+  message(sprintf("* Loading corpus language: %s", lang))
   message(sprintf("  - blogs:   %s", f_blogs))
   message(sprintf("  - news:    %s", f_news))
   message(sprintf("  - twitter: %s", f_twitter))
@@ -69,7 +69,7 @@ load_corpus <- function(lang = "en_US", base_dir = "data/raw", n_cores = NULL) {
   if (is.null(n_cores)) {
     n_cores <- max(1, parallel::detectCores() - 6)
   }
-  message(sprintf("• Setting up parallel processing with %d cores...", n_cores))
+  message(sprintf("* Setting up parallel processing with %d cores...", n_cores))
   
   # --- Setup parallel processing ---
   cl <- parallel::makeCluster(n_cores)
@@ -82,7 +82,7 @@ load_corpus <- function(lang = "en_US", base_dir = "data/raw", n_cores = NULL) {
   parallel::clusterEvalQ(cl, library(readr))
   
   # --- Read files in parallel ---
-  message("• Reading files in parallel...")
+  message("* Reading files in parallel...")
   file_data <- parallel::parLapply(cl, paths, function(file_path) {
     content <- readr::read_lines(file_path, progress = FALSE)
     # Normalize encoding to UTF-8

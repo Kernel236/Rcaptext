@@ -17,6 +17,7 @@ utils::globalVariables(c(
   # Language modeling variables
   "p_cond",     # conditional probability
   "score",      # prediction score
+  "p_mle",      # MLE probability (perplexity)
   # ML pipeline variables (make_test_trigrams.R)
   ".row_id",    # row identifier for train/test split
   ".text",      # temporary text column in test case generation
@@ -35,5 +36,12 @@ utils::globalVariables(c(
   "stat",       # statistic name in pivot_longer
   "ms",         # milliseconds value
   "p",          # proportion/percentage
-  "k"           # k value for accuracy@k
+  "k",          # k value for accuracy@k
+  # Perplexity variables
+  "scope",      # perplexity scope (doc/corpus)
+  "mean_logp",  # mean log probability
+  "perplexity", # perplexity metric
+  "N",          # number of tokens
+  "model_id",   # model identifier
+  "accuracy"    # accuracy metric
 ))

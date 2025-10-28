@@ -173,21 +173,24 @@ evaluate_accuracy_at_k <- function(
     gc(verbose = FALSE)
     
     if (use_progress) {
-      # Steps: nrow predictions + optional timing_n timings
-      total_steps <- nrow(test_windows) + (if (timeit) timing_n else 0)
-      p <- progressr::progressor(steps = total_steps)
+      cli::cli_alert_success("Unigram fallback ready ({nrow(uni_fallback)} words)")
     }
-
-    # ---- Generate per-case predictions ----
-    # Adaptive progress: update every 1% or every 1000 cases, whichever is smaller
-    n_cases <- nrow(test_windows)
-    progress_interval <- min(1000, max(10, ceiling(n_cases / 100)))
     
-    pred_list <- lapply(seq_len(n_cases), function(i) {
-      if (use_progress) {
-        if (i %% progress_interval == 0 || i == n_cases) {
-          p(sprintf("predict %d/%d", i, n_cases))
-        }
+    # ---- Generate per-case predictions ----
+    n_cases <- nrow(test_windows)
+    
+    # Setup progress with fixed steps (100 updates)
+    if (use_progress) {
+      cli::cli_alert_info("Generating predictions for {n_cases} test cases...")
+      progress_steps <- 100  # 100 updates = 1% each
+      p <- progressr::progressor(steps = progress_steps)
+      progress_every <- ceiling(n_cases / progress_steps)
+    }
+    
+    pred_list <- vector("list", n_cases)
+    for (i in seq_len(n_cases)) {
+      if (use_progress && i %% progress_every == 0) {
+        p(sprintf("Predicting (%d%%)", round(100 * i / n_cases)))
       }
       x <- test_windows$input_text[i]
       preds <- get_pred_vec(x, tri_pruned, bi_pruned, uni_lookup, 
@@ -196,8 +199,8 @@ evaluate_accuracy_at_k <- function(
       if (length(preds) < Kmax) {
         preds <- c(preds, rep(NA_character_, Kmax - length(preds)))
       }
-      preds
-    })
+      pred_list[[i]] <- preds
+    }
 
     # Build wide table with pred1, pred2, ..., predK columns
     pred_mat <- do.call(rbind, pred_list)
@@ -230,19 +233,24 @@ evaluate_accuracy_at_k <- function(
     # ---- Optional: Measure prediction latency ----
     timing_tbl <- NULL
     if (isTRUE(timeit)) {
+      if (use_progress) {
+        cli::cli_alert_info("Measuring prediction latency ({timing_n} samples)...")
+      }
+      
       set.seed(seed)
       # Sample subset of test cases for timing to avoid long runtimes
       idx <- sample.int(nrow(test_windows), size = min(timing_n, nrow(test_windows)))
       t_ms <- numeric(length(idx))
       
-      # Adaptive progress: update every 10 cases or every 5%, whichever is larger
-      timing_interval <- max(10, ceiling(length(idx) / 20))
+      # Setup progress for timing (20 steps)
+      if (use_progress) {
+        p_timing <- progressr::progressor(steps = 20)
+        timing_every <- ceiling(length(idx) / 20)
+      }
       
       for (j in seq_along(idx)) {
-        if (use_progress) {
-          if (j %% timing_interval == 0 || j == length(idx)) {
-            p(sprintf("timing %d/%d", j, length(idx)))
-          }
+        if (use_progress && j %% timing_every == 0) {
+          p_timing(sprintf("Timing (%d%%)", round(100 * j / length(idx))))
         }
         q <- test_windows$input_text[idx[j]]
         t0 <- proc.time()[["elapsed"]]

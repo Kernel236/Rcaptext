@@ -158,7 +158,7 @@ plot_rank_frequency <- function(freq_tbl, top = 5000, name_col = "word", p_col =
     ggplot2::labs(
       x = "Rank (log scale)",
       y = "Frequency (log scale)",
-      title = paste("Rank–frequency (top", top, ")")
+      title = paste("Rank-frequency (top", top, ")")
     ) +
     ggplot2::theme_minimal()
 }
