@@ -16,6 +16,8 @@
 #'   category (default: TRUE).
 #' @param drop_na_targets Logical. If TRUE, removes rows where target is NA or empty
 #'   (default: TRUE).
+#' @param use_progress Logical. If TRUE, displays progress bars using progressr
+#'   and informative messages using cli (default: TRUE).
 #'
 #' @return Tibble with columns:
 #'   \describe{
@@ -75,7 +77,8 @@ make_test_trigrams <- function(
     seed = 123,
     min_words = 3,
     by_source = TRUE,
-    drop_na_targets = TRUE
+    drop_na_targets = TRUE,
+    use_progress = TRUE
 ) {
   stopifnot("source" %in% names(corpus))
   stopifnot(text_col %in% names(corpus))
@@ -84,46 +87,69 @@ make_test_trigrams <- function(
   
   set.seed(seed)
 
-  # 1) Optional sampling of corpus rows (stratified by source)
-  sampled <- if (isTRUE(by_source)) {
-    corpus %>%
-      dplyr::group_by(.data$source) %>%
-      dplyr::slice_sample(prop = prop) %>%
-      dplyr::ungroup()
+  # Wrapper for progress
+  run_generation <- function() {
+    if (use_progress) {
+      cli::cli_h2("Generating test trigrams")
+      p <- progressr::progressor(steps = 3)
+    }
+
+    # 1) Optional sampling of corpus rows (stratified by source)
+    if (use_progress) p("Sampling test rows")
+    sampled <- if (isTRUE(by_source)) {
+      corpus %>%
+        dplyr::group_by(.data$source) %>%
+        dplyr::slice_sample(prop = prop) %>%
+        dplyr::ungroup()
+    } else {
+      corpus %>% 
+        dplyr::slice_sample(prop = prop)
+    }
+
+    # 2) Filter rows with at least min_words tokens (post-clean)
+    if (use_progress) p("Filtering by min_words")
+    sampled <- sampled %>%
+      dplyr::mutate(
+        .text = .data[[text_col]],
+        .wc = stringr::str_count(.data$.text, "(?i)[a-z']+")
+      ) %>%
+      dplyr::filter(!is.na(.data$.text), .data$.wc >= min_words)
+
+    # 3) Generate trigrams per row and separate into w1, w2, w3
+    if (use_progress) {
+      p("Generating 3-grams windows")
+    }
+    tri <- sampled %>%
+      tidytext::unnest_tokens(output = "ng", input = .data$.text, 
+                             token = "ngrams", n = 3, drop = TRUE) %>%
+      tidyr::separate(.data$ng, into = c("w1","w2","w3"), sep = " ", remove = TRUE) %>%
+      dplyr::filter(!is.na(.data$w1), !is.na(.data$w2), !is.na(.data$w3), 
+                    .data$w1 != "", .data$w2 != "", .data$w3 != "")
+
+    # 4) Build input_text and target columns
+    out <- tri %>%
+      dplyr::mutate(
+        input_text = paste(.data$w1, .data$w2), 
+        target = .data$w3
+      ) %>%
+      dplyr::select(.data$input_text, .data$w1, .data$w2, .data$target, .data$source)
+
+    if (isTRUE(drop_na_targets)) {
+      out <- out %>% 
+        dplyr::filter(!is.na(.data$target), .data$target != "")
+    }
+
+    if (use_progress) {
+      cli::cli_alert_success("Generated {nrow(out)} test trigrams")
+    }
+
+    return(out)
+  }
+
+  # Execute with or without progress
+  if (use_progress) {
+    progressr::with_progress(run_generation())
   } else {
-    corpus %>% 
-      dplyr::slice_sample(prop = prop)
+    run_generation()
   }
-
-  # 2) Filter rows with at least min_words tokens (post-clean)
-  # Simple token count: count pattern [a-z']+
-  sampled <- sampled %>%
-    dplyr::mutate(
-      .text = .data[[text_col]],
-      .wc = stringr::str_count(.data$.text, "(?i)[a-z']+")
-    ) %>%
-    dplyr::filter(!is.na(.data$.text), .data$.wc >= min_words)
-
-  # 3) Generate trigrams per row and separate into w1, w2, w3
-  tri <- sampled %>%
-    tidytext::unnest_tokens(output = "ng", input = .data$.text, 
-                           token = "ngrams", n = 3, drop = TRUE) %>%
-    tidyr::separate(.data$ng, into = c("w1","w2","w3"), sep = " ", remove = TRUE) %>%
-    dplyr::filter(!is.na(.data$w1), !is.na(.data$w2), !is.na(.data$w3), 
-                  .data$w1 != "", .data$w2 != "", .data$w3 != "")
-
-  # 4) Build input_text and target columns
-  out <- tri %>%
-    dplyr::mutate(
-      input_text = paste(.data$w1, .data$w2), 
-      target = .data$w3
-    ) %>%
-    dplyr::select(.data$input_text, .data$w1, .data$w2, .data$target, .data$source)
-
-  if (isTRUE(drop_na_targets)) {
-    out <- out %>% 
-      dplyr::filter(!is.na(.data$target), .data$target != "")
-  }
-
-  out
 }

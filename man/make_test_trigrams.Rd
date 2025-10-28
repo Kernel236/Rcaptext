@@ -11,7 +11,8 @@ make_test_trigrams(
   seed = 123,
   min_words = 3,
   by_source = TRUE,
-  drop_na_targets = TRUE
+  drop_na_targets = TRUE,
+  use_progress = TRUE
 )
 }
 \arguments{
@@ -33,6 +34,9 @@ category (default: TRUE).}
 
 \item{drop_na_targets}{Logical. If TRUE, removes rows where target is NA or empty
 (default: TRUE).}
+
+\item{use_progress}{Logical. If TRUE, displays progress bars using progressr
+and informative messages using cli (default: TRUE).}
 }
 \value{
 Tibble with columns:

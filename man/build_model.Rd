@@ -21,7 +21,8 @@ build_model(
   topN_tri = 8,
   out_dir = "data/processed",
   save = TRUE,
-  return_freq = FALSE
+  return_freq = FALSE,
+  use_progress = TRUE
 )
 }
 \arguments{
@@ -73,6 +74,9 @@ Created automatically if missing.}
 
 \item{return_freq}{Logical. If TRUE, includes raw frequency tables in the returned
 list (can be large). Useful for debugging (default: FALSE).}
+
+\item{use_progress}{Logical. If TRUE, displays progress bars using progressr
+and informative messages using cli (default: TRUE).}
 }
 \value{
 A list containing the complete language model:

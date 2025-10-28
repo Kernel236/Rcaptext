@@ -37,6 +37,8 @@
 #'   \code{bi_pruned.rds}, \code{tri_pruned.rds}, \code{lang_meta.rds} (default: TRUE).
 #' @param return_freq Logical. If TRUE, includes raw frequency tables in the returned
 #'   list (can be large). Useful for debugging (default: FALSE).
+#' @param use_progress Logical. If TRUE, displays progress bars using progressr
+#'   and informative messages using cli (default: TRUE).
 #'
 #' @return A list containing the complete language model:
 #'   \describe{
@@ -123,112 +125,167 @@ build_model <- function(train_corpus,
                         topN_tri = 8,
                         out_dir = "data/processed",
                         save = TRUE,
-                        return_freq = FALSE) {
+                        return_freq = FALSE,
+                        use_progress = TRUE) {
 
-  # ---- Basic checks ----
-  if (!"source" %in% names(train_corpus)) {
-    stop("`train_corpus` must have a `source` column (blogs/news/twitter).")
-  }
-  
-  if (!text_col %in% names(train_corpus)) {
-    if (isTRUE(ensure_clean) && "text" %in% names(train_corpus)) {
-      message(">> `", text_col, "` not found. Creating it from `text` via clean_text()...")
-      train_corpus <- train_corpus %>%
-        dplyr::mutate(!!rlang::sym(text_col) := clean_text(.data[["text"]]))
+  # Wrapper function for progress tracking
+  run_pipeline <- function() {
+    # Initialize progress if requested
+    if (use_progress) {
+      cli::cli_h2("Building language model")
+      p <- progressr::progressor(steps = 8)
+    }
+    
+    # ---- Basic checks ----
+    if (use_progress) p("Check & cleaning columns")
+    if (!"source" %in% names(train_corpus)) {
+      stop("`train_corpus` must have a `source` column (blogs/news/twitter).")
+    }
+    
+    if (!text_col %in% names(train_corpus)) {
+      if (isTRUE(ensure_clean) && "text" %in% names(train_corpus)) {
+        if (!use_progress) message(">> `", text_col, "` not found. Creating it from `text` via clean_text()...")
+        train_corpus <<- train_corpus %>%
+          dplyr::mutate(!!rlang::sym(text_col) := clean_text(.data[["text"]]))
+      } else {
+        stop("Column `", text_col, "` not found and `ensure_clean=FALSE`. ",
+             "Provide a cleaned text column or set ensure_clean=TRUE.")
+      }
+    }
+
+    # ---- Drop short/empty lines ----
+    if (use_progress) p("Filtering short/empty lines")
+    if (!use_progress) message(">> Filtering short/empty lines (min_chars = ", min_chars, ")")
+    train_corpus <<- train_corpus %>%
+      dplyr::filter(!is.na(.data[[text_col]]), nchar(.data[[text_col]]) >= min_chars)
+
+    # ---- Optional sampling for RAM control (stratified by source) ----
+    if (!is.null(sample_prop)) {
+      if (sample_prop <= 0 || sample_prop > 1) {
+        stop("`sample_prop` must be in (0,1].")
+      }
+      set.seed(seed)
+      if (use_progress) {
+        p("(Optional) Sampling train")
+      } else {
+        message(">> Sampling TRAIN by source (prop = ", sample_prop, ", seed = ", seed, ")")
+      }
+      train_corpus <<- train_corpus %>%
+        dplyr::group_by(.data$source) %>%
+        dplyr::slice_sample(prop = sample_prop) %>%
+        dplyr::ungroup()
     } else {
-      stop("Column `", text_col, "` not found and `ensure_clean=FALSE`. ",
-           "Provide a cleaned text column or set ensure_clean=TRUE.")
+      if (use_progress) p("(Optional) Sampling train")
     }
-  }
 
-  # ---- Drop short/empty lines ----
-  message(">> Filtering short/empty lines (min_chars = ", min_chars, ")")
-  train_corpus <- train_corpus %>%
-    dplyr::filter(!is.na(.data[[text_col]]), nchar(.data[[text_col]]) >= min_chars)
-
-  # ---- Optional sampling for RAM control (stratified by source) ----
-  if (!is.null(sample_prop)) {
-    if (sample_prop <= 0 || sample_prop > 1) {
-      stop("`sample_prop` must be in (0,1].")
+    # ---- Tokenize ----
+    if (use_progress) {
+      p("Tokenizing UNI/BI/TRI")
+    } else {
+      message(">> Tokenizing (UNI/BI/TRI)")
     }
-    set.seed(seed)
-    message(">> Sampling TRAIN by source (prop = ", sample_prop, ", seed = ", seed, ")")
-    train_corpus <- train_corpus %>%
-      dplyr::group_by(.data$source) %>%
-      dplyr::slice_sample(prop = sample_prop) %>%
-      dplyr::ungroup()
-  }
-
-  # ---- Tokenize ----
-  message(">> Tokenizing (UNI/BI/TRI)")
-  uni <- tokenize_unigrams(train_corpus, text_col = !!rlang::sym(text_col))
-  bi  <- tokenize_bigrams(train_corpus,  text_col = !!rlang::sym(text_col))
-  tri <- tokenize_trigrams(train_corpus, text_col = !!rlang::sym(text_col))
-  
-  # Free memory: train_corpus no longer needed after tokenization
-  rm(train_corpus)
-  gc(verbose = FALSE)
-
-  # ---- Frequencies ----
-  message(">> Computing frequency tables")
-  freq_uni <- freq_unigrams(uni)   # word, n, p
-  freq_bi  <- freq_bigrams(bi)     # w1, w2, n, p
-  freq_tri <- freq_trigrams(tri)   # w1, w2, w3, n, p
-  
-  # Free memory: tokenized data no longer needed after frequency computation
-  rm(uni, bi, tri)
-  gc(verbose = FALSE)
-
-  # ---- Optional OOV/foreign filter on unigrams ----
-  if (isTRUE(oov_filter)) {
-    message(">> Filtering likely non-English unigrams (hunspell dict = ", dict, ")")
-    freq_uni <- filter_non_english_unigrams(
-      freq_uni, 
-      dict = dict,
-      min_len = min_len_oov,
-      keep_stopwords = keep_stopwords
-    )
-  } else {
-    message(">> Skipping OOV/foreign filter on unigrams")
-  }
-
-  # ---- Build pruned language model + save ----
-  message(">> Building pruned language model (min_count_bi=", min_count_bi,
-          ", min_count_tri=", min_count_tri, 
-          ", topN_bi=", topN_bi, 
-          ", topN_tri=", topN_tri, ")")
-  
-  lang_model <- build_pruned_lang_model(
-    freq_uni = freq_uni,
-    freq_bi  = freq_bi,
-    freq_tri = freq_tri,
-    min_count_bi  = min_count_bi,
-    min_count_tri = min_count_tri,
-    topN_bi  = topN_bi,
-    topN_tri = topN_tri,
-    save     = save,
-    out_dir  = out_dir
-  )
-  
-  # Free memory: frequency tables no longer needed unless return_freq=TRUE
-  if (!isTRUE(return_freq)) {
-    rm(freq_uni, freq_bi, freq_tri)
+    uni <- tokenize_unigrams(train_corpus, text_col = !!rlang::sym(text_col))
+    bi  <- tokenize_bigrams(train_corpus,  text_col = !!rlang::sym(text_col))
+    tri <- tokenize_trigrams(train_corpus, text_col = !!rlang::sym(text_col))
+    
+    # Free memory: train_corpus no longer needed after tokenization
+    rm(train_corpus, envir = parent.frame())
     gc(verbose = FALSE)
-  }
 
-  message(">> Model built successfully! Sizes (before/after pruning):")
-  print(lang_model$meta$sizes)
-  
-  if (isTRUE(save)) {
-    message(">> RDS files saved to: ", out_dir)
-  }
+    # ---- Frequencies ----
+    if (use_progress) {
+      p("Computing frequencies")
+    } else {
+      message(">> Computing frequency tables")
+    }
+    freq_uni <- freq_unigrams(uni)   # word, n, p
+    freq_bi  <- freq_bigrams(bi)     # w1, w2, n, p
+    freq_tri <- freq_trigrams(tri)   # w1, w2, w3, n, p
+    
+    # Free memory: tokenized data no longer needed after frequency computation
+    rm(uni, bi, tri)
+    gc(verbose = FALSE)
 
-  # ---- Return ----
-  if (isTRUE(return_freq)) {
-    lang_model$freq_uni <- freq_uni
-    lang_model$freq_bi  <- freq_bi
-    lang_model$freq_tri <- freq_tri
+    # ---- Optional OOV/foreign filter on unigrams ----
+    if (isTRUE(oov_filter)) {
+      if (use_progress) {
+        p("(Optional) Filtering non-English unigrams")
+      } else {
+        message(">> Filtering likely non-English unigrams (hunspell dict = ", dict, ")")
+      }
+      freq_uni <- filter_non_english_unigrams(
+        freq_uni, 
+        dict = dict,
+        min_len = min_len_oov,
+        keep_stopwords = keep_stopwords
+      )
+    } else {
+      if (use_progress) {
+        p("(Optional) Filtering non-English unigrams")
+      } else {
+        message(">> Skipping OOV/foreign filter on unigrams")
+      }
+    }
+
+    # ---- Build pruned language model + save ----
+    if (use_progress) {
+      p("Building conditional + pruning")
+    } else {
+      message(">> Building pruned language model (min_count_bi=", min_count_bi,
+              ", min_count_tri=", min_count_tri, 
+              ", topN_bi=", topN_bi, 
+              ", topN_tri=", topN_tri, ")")
+    }
+    
+    lang_model <- build_pruned_lang_model(
+      freq_uni = freq_uni,
+      freq_bi  = freq_bi,
+      freq_tri = freq_tri,
+      min_count_bi  = min_count_bi,
+      min_count_tri = min_count_tri,
+      topN_bi  = topN_bi,
+      topN_tri = topN_tri,
+      save     = save,
+      out_dir  = out_dir
+    )
+    
+    # Free memory: frequency tables no longer needed unless return_freq=TRUE
+    if (!isTRUE(return_freq)) {
+      rm(freq_uni, freq_bi, freq_tri)
+      gc(verbose = FALSE)
+    }
+
+    # ---- Save/Finalize ----
+    if (use_progress) {
+      if (save) {
+        p("Saving RDS")
+        cli::cli_alert_success("Model built! Saved to {.path {out_dir}}")
+      } else {
+        p("Finalizing model")
+        cli::cli_alert_success("Model built!")
+      }
+    } else {
+      message(">> Model built successfully! Sizes (before/after pruning):")
+      print(lang_model$meta$sizes)
+      if (isTRUE(save)) {
+        message(">> RDS files saved to: ", out_dir)
+      }
+    }
+
+    # ---- Return ----
+    if (isTRUE(return_freq)) {
+      lang_model$freq_uni <- freq_uni
+      lang_model$freq_bi  <- freq_bi
+      lang_model$freq_tri <- freq_tri
+    }
+    
+    return(lang_model)
   }
   
-  lang_model
+  # Execute with or without progress wrapper
+  if (use_progress) {
+    progressr::with_progress(run_pipeline())
+  } else {
+    run_pipeline()
+  }
 }

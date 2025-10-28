@@ -78,5 +78,7 @@
 #'   \item \code{en_US.twitter.txt}
 #' }
 #'
+#' @importFrom utils tail data
+#' @importFrom stats reorder
 #' @keywords internal
 "_PACKAGE"

@@ -18,6 +18,8 @@
 #' @param timing_n Integer. Number of random test cases to time for performance
 #'   profiling (default: 200). Useful for assessing real-time usability.
 #' @param seed Integer. Random seed for reproducibility in timing sample (default: 123).
+#' @param use_progress Logical. If TRUE, displays progress bars using progressr
+#'   and informative messages using cli (default: TRUE).
 #'
 #' @return A list with three components:
 #'   \describe{
@@ -116,81 +118,111 @@ evaluate_accuracy_at_k <- function(
   ks = c(1, 2, 3),
   timeit = TRUE,
   timing_n = 200,
-  seed = 123
+  seed = 123,
+  use_progress = TRUE
 ) {
   stopifnot(all(c("input_text", "target") %in% names(test_windows)))
   Kmax <- max(ks)
 
-  # ---- Generate per-case predictions ----
-  # Use lapply to avoid extra dependencies (no dplyr::rowwise)
-  pred_list <- lapply(seq_len(nrow(test_windows)), function(i) {
-    x <- test_windows$input_text[i]
-    preds <- get_pred_vec(x, tri_pruned, bi_pruned, uni_lookup, alpha = alpha, top_n = Kmax)
-    # Pad with NA if model returns fewer than Kmax predictions
-    if (length(preds) < Kmax) {
-      preds <- c(preds, rep(NA_character_, Kmax - length(preds)))
+  # Wrapper for progress
+  run_evaluation <- function() {
+    if (use_progress) {
+      cli::cli_h2("Evaluating model")
+      # Steps: nrow predictions + optional timing_n timings
+      total_steps <- nrow(test_windows) + (if (timeit) timing_n else 0)
+      p <- progressr::progressor(steps = total_steps)
     }
-    preds
-  })
 
-  # Build wide table with pred1, pred2, ..., predK columns
-  pred_mat <- do.call(rbind, pred_list)
-  colnames(pred_mat) <- paste0("pred", seq_len(Kmax))
-  per_case <- dplyr::bind_cols(
-    test_windows %>% dplyr::select(.data$input_text, .data$target),
-    as.data.frame(pred_mat, stringsAsFactors = FALSE)
-  )
+    # ---- Generate per-case predictions ----
+    pred_list <- lapply(seq_len(nrow(test_windows)), function(i) {
+      if (use_progress) {
+        if (i %% 10000 == 0 || i == nrow(test_windows)) {
+          p(sprintf("predict %d/%d", i, nrow(test_windows)))
+        }
+      }
+      x <- test_windows$input_text[i]
+      preds <- get_pred_vec(x, tri_pruned, bi_pruned, uni_lookup, alpha = alpha, top_n = Kmax)
+      # Pad with NA if model returns fewer than Kmax predictions
+      if (length(preds) < Kmax) {
+        preds <- c(preds, rep(NA_character_, Kmax - length(preds)))
+      }
+      preds
+    })
 
-  # Compute rank_hit: position of first match between target and predictions (1-based)
-  # Returns NA if target not found in top-K
-  per_case$rank_hit <- apply(per_case[paste0("pred", seq_len(Kmax))], 1, function(row) {
-    hit_pos <- which(row == per_case$target[which(rownames(per_case) == rownames(as.data.frame(t(row))))])
-    if (length(hit_pos) == 0) NA_integer_ else hit_pos[1]
-  })
-
-  # ---- Aggregate accuracy@k metrics ----
-  acc_tbl <- lapply(ks, function(k) {
-    # For each test case, check if target appears in top-k predictions
-    hits_k <- mapply(function(target, ...) {
-      preds_k <- c(...)
-      any(preds_k[seq_len(k)] == target, na.rm = TRUE)
-    }, per_case$target, split(per_case[paste0("pred", seq_len(Kmax))], seq_len(nrow(per_case))) )
-    dplyr::tibble(k = k, accuracy = mean(hits_k, na.rm = TRUE))
-  }) %>% dplyr::bind_rows()
-  
-  # Free memory: pred_list and pred_mat no longer needed
-  rm(pred_list, pred_mat)
-  gc(verbose = FALSE)
-
-  # ---- Optional: Measure prediction latency ----
-  timing_tbl <- NULL
-  if (isTRUE(timeit)) {
-    set.seed(seed)
-    # Sample subset of test cases for timing to avoid long runtimes
-    idx <- sample.int(nrow(test_windows), size = min(timing_n, nrow(test_windows)))
-    t_ms <- numeric(length(idx))
-    
-    for (j in seq_along(idx)) {
-      q <- test_windows$input_text[idx[j]]
-      t0 <- proc.time()[["elapsed"]]
-      invisible(get_pred_vec(q, tri_pruned, bi_pruned, uni_lookup, alpha = alpha, top_n = Kmax))
-      t1 <- proc.time()[["elapsed"]]
-      t_ms[j] <- (t1 - t0) * 1000  # Convert to milliseconds
-    }
-    
-    timing_tbl <- dplyr::tibble(
-      mean_ms = mean(t_ms),
-      p50_ms  = stats::quantile(t_ms, 0.50, names = FALSE),
-      p95_ms  = stats::quantile(t_ms, 0.95, names = FALSE),
-      n_calls = length(t_ms)
+    # Build wide table with pred1, pred2, ..., predK columns
+    pred_mat <- do.call(rbind, pred_list)
+    colnames(pred_mat) <- paste0("pred", seq_len(Kmax))
+    per_case <- dplyr::bind_cols(
+      test_windows %>% dplyr::select(.data$input_text, .data$target),
+      as.data.frame(pred_mat, stringsAsFactors = FALSE)
     )
+
+    # Compute rank_hit: position of first match between target and predictions (1-based)
+    per_case$rank_hit <- apply(per_case[paste0("pred", seq_len(Kmax))], 1, function(row) {
+      hit_pos <- which(row == per_case$target[which(rownames(per_case) == rownames(as.data.frame(t(row))))])
+      if (length(hit_pos) == 0) NA_integer_ else hit_pos[1]
+    })
+
+    # ---- Aggregate accuracy@k metrics ----
+    acc_tbl <- lapply(ks, function(k) {
+      # For each test case, check if target appears in top-k predictions
+      hits_k <- mapply(function(target, ...) {
+        preds_k <- c(...)
+        any(preds_k[seq_len(k)] == target, na.rm = TRUE)
+      }, per_case$target, split(per_case[paste0("pred", seq_len(Kmax))], seq_len(nrow(per_case))) )
+      dplyr::tibble(k = k, accuracy = mean(hits_k, na.rm = TRUE))
+    }) %>% dplyr::bind_rows()
+    
+    # Free memory: pred_list and pred_mat no longer needed
+    rm(pred_list, pred_mat)
+    gc(verbose = FALSE)
+
+    # ---- Optional: Measure prediction latency ----
+    timing_tbl <- NULL
+    if (isTRUE(timeit)) {
+      set.seed(seed)
+      # Sample subset of test cases for timing to avoid long runtimes
+      idx <- sample.int(nrow(test_windows), size = min(timing_n, nrow(test_windows)))
+      t_ms <- numeric(length(idx))
+      
+      for (j in seq_along(idx)) {
+        if (use_progress) {
+          if (j %% 50 == 0 || j == length(idx)) {
+            p(sprintf("timing %d/%d", j, length(idx)))
+          }
+        }
+        q <- test_windows$input_text[idx[j]]
+        t0 <- proc.time()[["elapsed"]]
+        invisible(get_pred_vec(q, tri_pruned, bi_pruned, uni_lookup, alpha = alpha, top_n = Kmax))
+        t1 <- proc.time()[["elapsed"]]
+        t_ms[j] <- (t1 - t0) * 1000  # Convert to milliseconds
+      }
+      
+      timing_tbl <- dplyr::tibble(
+        mean_ms = mean(t_ms),
+        p50_ms  = stats::quantile(t_ms, 0.50, names = FALSE),
+        p95_ms  = stats::quantile(t_ms, 0.95, names = FALSE),
+        n_calls = length(t_ms)
+      )
+    }
+
+    if (use_progress) {
+      cli::cli_alert_success("Evaluation complete! Accuracy@{max(ks)}: {round(acc_tbl$accuracy[acc_tbl$k == max(ks)], 3)}")
+    }
+
+    return(list(
+      accuracy = acc_tbl,
+      per_case = per_case,
+      timing   = timing_tbl
+    ))
   }
 
-  list(
-    accuracy = acc_tbl,
-    per_case = per_case,
-    timing   = timing_tbl
-  )
+  # Execute with or without progress
+  if (use_progress) {
+    progressr::with_progress(run_evaluation())
+  } else {
+    run_evaluation()
+  }
 }
 
 
