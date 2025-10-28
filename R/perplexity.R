@@ -107,9 +107,14 @@ evaluate_perplexity <- function(test_windows,
   do_compute <- function() {
     n <- nrow(test_windows)
     logp <- numeric(n)
+    
+    # Progress update every 1% (like in evaluate_accuracy_at_k)
+    update_every <- ceiling(n / 100)
 
     for (i in seq_len(n)) {
-      if (isTRUE(use_progress) && requireNamespace("progressr", quietly = TRUE)) p()
+      if (isTRUE(use_progress) && requireNamespace("progressr", quietly = TRUE)) {
+        if (i %% update_every == 0 || i == n) p()
+      }
       logp[i] <- token_logprob_sb(
         w1 = test_windows$w1[i],
         w2 = test_windows$w2[i],
@@ -160,7 +165,7 @@ evaluate_perplexity <- function(test_windows,
 
   if (isTRUE(use_progress) && requireNamespace("progressr", quietly = TRUE)) {
     progressr::with_progress({
-      p <<- progressr::progressor(steps = nrow(test_windows))
+      p <<- progressr::progressor(steps = 100)
       do_compute()
     })
   } else {
