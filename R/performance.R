@@ -352,3 +352,254 @@ summarise_and_plot_eval <- function(eval_res, plot_latency = TRUE) {
   
   invisible(perf)
 }
+
+
+# ===============================================================================
+#  TIMING & CACHING UTILITIES
+# ===============================================================================
+
+#' Timed Prediction Wrapper
+#'
+#' Wrapper function that measures execution time of prediction functions.
+#' Returns both prediction results and timing information for performance analysis.
+#'
+#' @param prediction_func Function. The prediction function to time (predict_next or predict_interpolated)
+#' @param ... Arguments passed to the prediction function
+#' @param detailed_timing Logical. If TRUE, returns detailed timing breakdown (default: FALSE)
+#'
+#' @return List containing:
+#'   \itemize{
+#'     \item \code{predictions}: Data frame with prediction results
+#'     \item \code{elapsed_ms}: Total elapsed time in milliseconds
+#'     \item \code{timing_info}: Additional timing details if detailed_timing=TRUE
+#'   }
+#'
+#' @examples
+#' \dontrun{
+#' result <- timed_predict(
+#'   predict_next,
+#'   input = "Hello world",
+#'   tri_pruned = tri_model,
+#'   bi_pruned = bi_model,
+#'   uni_lookup = uni_model
+#' )
+#' 
+#' cat("Predictions took:", result$elapsed_ms, "ms\n")
+#' print(result$predictions)
+#' }
+#'
+#' @export
+timed_predict <- function(prediction_func, ..., detailed_timing = FALSE) {
+  if (detailed_timing) {
+    # Detailed timing with system.time
+    timing <- system.time({
+      predictions <- prediction_func(...)
+    })
+    
+    return(list(
+      predictions = predictions,
+      elapsed_ms = as.numeric(timing["elapsed"]) * 1000,
+      timing_info = list(
+        user_ms = as.numeric(timing["user.self"]) * 1000,
+        system_ms = as.numeric(timing["sys.self"]) * 1000,
+        elapsed_ms = as.numeric(timing["elapsed"]) * 1000
+      )
+    ))
+  } else {
+    # Simple timing with proc.time
+    start_time <- proc.time()
+    predictions <- prediction_func(...)
+    end_time <- proc.time()
+    
+    elapsed <- as.numeric((end_time - start_time)["elapsed"]) * 1000
+    
+    return(list(
+      predictions = predictions,
+      elapsed_ms = elapsed,
+      timing_info = NULL
+    ))
+  }
+}
+
+#' Build IDF Lookup Table
+#'
+#' Pre-computes Inverse Document Frequency (IDF) scores for all words in the unigram model.
+#' This lookup table can be reused across multiple predictions to improve performance.
+#'
+#' @param uni_lookup Data frame. Unigram model with columns: word, p
+#' @param smooth Numeric. Smoothing parameter to avoid log(0) (default: 1e-12)
+#'
+#' @return Data frame with columns:
+#'   \itemize{
+#'     \item \code{word}: Word from vocabulary
+#'     \item \code{idf}: Inverse document frequency score
+#'   }
+#'
+#' @examples
+#' \dontrun{
+#' idf_table <- build_idf_lookup(uni_lookup)
+#' 
+#' # Use in predictions
+#' predictions <- predict_interpolated(
+#'   input = "Hello world",
+#'   tri_pruned = tri_model,
+#'   bi_pruned = bi_model,
+#'   uni_lookup = uni_model,
+#'   idf_lookup = idf_table  # Pre-computed for speed
+#' )
+#' }
+#'
+#' @importFrom dplyr mutate select
+#' @export
+build_idf_lookup <- function(uni_lookup, smooth = 1e-12) {
+  uni_lookup %>%
+    dplyr::mutate(idf = -log(.data$p + smooth)) %>%
+    dplyr::select(.data$word, .data$idf)
+}
+
+#' Simple LRU Cache for Predictions
+#'
+#' Implements a simple Least Recently Used (LRU) cache for prediction results.
+#' Useful for caching expensive prediction computations in interactive applications.
+#'
+#' @param max_size Integer. Maximum number of entries to cache (default: 100)
+#'
+#' @return List with cache methods:
+#'   \itemize{
+#'     \item \code{get(key)}: Retrieve cached result or NULL if not found
+#'     \item \code{set(key, value)}: Store result in cache
+#'     \item \code{clear()}: Clear all cached entries
+#'     \item \code{size()}: Get current cache size
+#'   }
+#'
+#' @examples
+#' \dontrun{
+#' cache <- create_lru_cache(max_size = 50)
+#' 
+#' # Check cache first
+#' key <- paste("predict", input, collapse = "_")
+#' result <- cache$get(key)
+#' 
+#' if (is.null(result)) {
+#'   result <- predict_next(input, tri_model, bi_model, uni_model)
+#'   cache$set(key, result)
+#' }
+#' }
+#'
+#' @export
+create_lru_cache <- function(max_size = 100) {
+  cache <- new.env(parent = emptyenv())
+  access_order <- character(0)
+  
+  list(
+    get = function(key) {
+      if (exists(key, envir = cache)) {
+        # Move to end (most recently used)
+        access_order <<- c(setdiff(access_order, key), key)
+        cache[[key]]
+      } else {
+        NULL
+      }
+    },
+    
+    set = function(key, value) {
+      # Add or update entry
+      cache[[key]] <- value
+      access_order <<- c(setdiff(access_order, key), key)
+      
+      # Evict oldest if over capacity
+      if (length(access_order) > max_size) {
+        oldest <- access_order[1]
+        rm(list = oldest, envir = cache)
+        access_order <<- access_order[-1]
+      }
+    },
+    
+    clear = function() {
+      rm(list = ls(cache), envir = cache)
+      access_order <<- character(0)
+    },
+    
+    size = function() {
+      length(access_order)
+    }
+  )
+}
+
+#' Benchmark Prediction Methods
+#'
+#' Compares performance of different prediction algorithms on a set of test inputs.
+#' Useful for evaluating the speed-accuracy trade-offs between methods.
+#'
+#' @param test_inputs Character vector. Test sentences to predict on
+#' @param tri_pruned Data frame. Trigram model  
+#' @param bi_pruned Data frame. Bigram model
+#' @param uni_lookup Data frame. Unigram model
+#' @param methods Character vector. Methods to test: "backoff", "interpolated", or both (default: both)
+#' @param top_k Integer. Number of predictions per method (default: 3)
+#' @param iterations Integer. Number of iterations per method for timing (default: 10)
+#'
+#' @return Data frame with benchmark results containing:
+#'   \itemize{
+#'     \item \code{method}: Prediction method name
+#'     \item \code{mean_time_ms}: Average prediction time in milliseconds
+#'     \item \code{median_time_ms}: Median prediction time in milliseconds  
+#'     \item \code{min_time_ms}: Minimum prediction time
+#'     \item \code{max_time_ms}: Maximum prediction time
+#'     \item \code{total_predictions}: Total number of predictions made
+#'   }
+#'
+#' @examples
+#' \dontrun{
+#' test_sentences <- c("I would like", "Hello world", "The weather is")
+#' 
+#' benchmark <- benchmark_methods(
+#'   test_inputs = test_sentences,
+#'   tri_pruned = tri_model,
+#'   bi_pruned = bi_model, 
+#'   uni_lookup = uni_model,
+#'   methods = c("backoff", "interpolated"),
+#'   iterations = 20
+#' )
+#' 
+#' print(benchmark)
+#' }
+#'
+#' @importFrom dplyr tibble bind_rows
+#' @export
+benchmark_methods <- function(test_inputs, tri_pruned, bi_pruned, uni_lookup,
+                             methods = c("backoff", "interpolated"), top_k = 3, iterations = 10) {
+  
+  results <- list()
+  
+  for (method in methods) {
+    times <- numeric()
+    
+    for (iteration in 1:iterations) {
+      for (input in test_inputs) {
+        if (method == "backoff") {
+          result <- timed_predict(predict_next, input = input, 
+                                 tri_pruned = tri_pruned, bi_pruned = bi_pruned, 
+                                 uni_lookup = uni_lookup, top_k = top_k)
+        } else if (method == "interpolated") {
+          result <- timed_predict(predict_interpolated, input = input,
+                                 tri_pruned = tri_pruned, bi_pruned = bi_pruned,
+                                 uni_lookup = uni_lookup, top_k = top_k)
+        }
+        
+        times <- c(times, result$elapsed_ms)
+      }
+    }
+    
+    results[[method]] <- dplyr::tibble(
+      method = method,
+      mean_time_ms = mean(times),
+      median_time_ms = median(times),
+      min_time_ms = min(times),
+      max_time_ms = max(times),
+      total_predictions = length(times)
+    )
+  }
+  
+  dplyr::bind_rows(results)
+}
