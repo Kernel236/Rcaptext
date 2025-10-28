@@ -78,6 +78,7 @@ extract_last_tokens <- function(input, k = 2) {
 #'     \item \code{n}: Frequency count (numeric)
 #'     \item \code{p}: Marginal probability (numeric)
 #'   }
+#'   Can also be a pre-computed unigram fallback table (see \code{uni_fallback} parameter).
 #' @param alpha Numeric. Backoff penalty factor (default: 0.4). Applied as:
 #'   \itemize{
 #'     \item Trigram scores: original p_cond (no penalty)
@@ -87,6 +88,10 @@ extract_last_tokens <- function(input, k = 2) {
 #'   Lower values give stronger preference to higher-order n-grams.
 #' @param top_k Integer. Number of predictions to return (default: 3).
 #'   Returns the top_k highest-scoring word predictions.
+#' @param uni_fallback Data frame or NULL. Pre-computed unigram fallback table with
+#'   columns (word, score, source). If provided, skips recomputing alpha^2 * p for
+#'   every prediction. Significantly speeds up batch predictions. If NULL (default),
+#'   computes on-the-fly from \code{uni_lookup}.
 #'
 #' @return Data frame with top_k predicted words containing columns:
 #'   \itemize{
@@ -142,14 +147,19 @@ extract_last_tokens <- function(input, k = 2) {
 #' @importFrom magrittr %>%
 #' @export
 predict_next <- function(input, tri_pruned, bi_pruned, uni_lookup,
-                         alpha = 0.4, top_k = 3) {
+                         alpha = 0.4, top_k = 3, uni_fallback = NULL) {
+  # Pre-compute unigram fallback if not provided (happens once per call)
+  if (is.null(uni_fallback)) {
+    uni_fallback <- uni_lookup %>%
+      dplyr::transmute(word = .data$word, score = (alpha^2) * .data$p, source = "unigram")
+  }
+  
   # last tokens (cleaned)
   last2 <- extract_last_tokens(input, k = 2)
   # fallback: if empty input, return top unigrams
   if (length(last2) == 0) {
     return(
-      uni_lookup %>%
-        dplyr::transmute(word = .data$word, score = (alpha^2) * .data$p, source = "unigram") %>%
+      uni_fallback %>%
         dplyr::arrange(dplyr::desc(.data$score)) %>%
         dplyr::slice_head(n = top_k)
     )
@@ -173,9 +183,8 @@ predict_next <- function(input, tri_pruned, bi_pruned, uni_lookup,
     dplyr::filter(.data$w1 == !!last1) %>%
     dplyr::transmute(word = .data$w2, score = alpha * .data$p_cond, source = "bigram")
 
-  # 3) UNIGRAM fallback with alpha^2
-  uni_cand <- uni_lookup %>%
-    dplyr::transmute(word = .data$word, score = (alpha^2) * .data$p, source = "unigram")
+  # 3) UNIGRAM fallback (use pre-computed version)
+  uni_cand <- uni_fallback
 
   # 4) Combine, deduplicate by best score, rank and top-k
   dplyr::bind_rows(tri_cand, bi_cand, uni_cand) %>%

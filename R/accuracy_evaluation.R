@@ -128,6 +128,14 @@ evaluate_accuracy_at_k <- function(
   run_evaluation <- function() {
     if (use_progress) {
       cli::cli_h2("Evaluating model")
+      cli::cli_alert_info("Pre-computing unigram fallback for speed optimization...")
+    }
+    
+    # ---- PRE-COMPUTE unigram fallback ONCE (HUGE performance boost!) ----
+    uni_fallback <- uni_lookup %>%
+      dplyr::transmute(word = .data$word, score = (alpha^2) * .data$p, source = "unigram")
+    
+    if (use_progress) {
       # Steps: nrow predictions + optional timing_n timings
       total_steps <- nrow(test_windows) + (if (timeit) timing_n else 0)
       p <- progressr::progressor(steps = total_steps)
@@ -145,7 +153,8 @@ evaluate_accuracy_at_k <- function(
         }
       }
       x <- test_windows$input_text[i]
-      preds <- get_pred_vec(x, tri_pruned, bi_pruned, uni_lookup, alpha = alpha, top_n = Kmax)
+      preds <- get_pred_vec(x, tri_pruned, bi_pruned, uni_lookup, 
+                           alpha = alpha, top_n = Kmax, uni_fallback = uni_fallback)
       # Pad with NA if model returns fewer than Kmax predictions
       if (length(preds) < Kmax) {
         preds <- c(preds, rep(NA_character_, Kmax - length(preds)))
@@ -200,7 +209,8 @@ evaluate_accuracy_at_k <- function(
         }
         q <- test_windows$input_text[idx[j]]
         t0 <- proc.time()[["elapsed"]]
-        invisible(get_pred_vec(q, tri_pruned, bi_pruned, uni_lookup, alpha = alpha, top_n = Kmax))
+        invisible(get_pred_vec(q, tri_pruned, bi_pruned, uni_lookup, 
+                              alpha = alpha, top_n = Kmax, uni_fallback = uni_fallback))
         t1 <- proc.time()[["elapsed"]]
         t_ms[j] <- (t1 - t0) * 1000  # Convert to milliseconds
       }
@@ -245,6 +255,8 @@ evaluate_accuracy_at_k <- function(
 #' @param uni_lookup Tibble. Unigram lookup table.
 #' @param alpha Numeric. Backoff coefficient (default: 0.4).
 #' @param top_n Integer. Number of predictions to return (default: 3).
+#' @param uni_fallback Tibble or NULL. Pre-computed unigram fallback table
+#'   for performance optimization (default: NULL).
 #'
 #' @return Character vector of length \code{top_n} with predicted words,
 #'   or shorter if model has fewer predictions. Never returns NA values
@@ -253,14 +265,15 @@ evaluate_accuracy_at_k <- function(
 #' @keywords internal
 #' @importFrom magrittr %>%
 get_pred_vec <- function(input_text, tri_pruned, bi_pruned, uni_lookup, 
-                         alpha = 0.4, top_n = 3) {
+                         alpha = 0.4, top_n = 3, uni_fallback = NULL) {
   pred_df <- predict_next(
     input = input_text,  # Note: predict_next uses 'input' not 'input_text'
     tri_pruned = tri_pruned,
     bi_pruned = bi_pruned,
     uni_lookup = uni_lookup,
     alpha = alpha,
-    top_k = top_n
+    top_k = top_n,
+    uni_fallback = uni_fallback
   )
   
   if (nrow(pred_df) == 0) {

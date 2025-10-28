@@ -10,7 +10,8 @@ get_pred_vec(
   bi_pruned,
   uni_lookup,
   alpha = 0.4,
-  top_n = 3
+  top_n = 3,
+  uni_fallback = NULL
 )
 }
 \arguments{
@@ -25,6 +26,9 @@ get_pred_vec(
 \item{alpha}{Numeric. Backoff coefficient (default: 0.4).}
 
 \item{top_n}{Integer. Number of predictions to return (default: 3).}
+
+\item{uni_fallback}{Tibble or NULL. Pre-computed unigram fallback table
+for performance optimization (default: NULL).}
 }
 \value{
 Character vector of length \code{top_n} with predicted words,

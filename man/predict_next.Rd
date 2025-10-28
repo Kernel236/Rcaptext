@@ -4,7 +4,15 @@
 \alias{predict_next}
 \title{Predict next word using Stupid Backoff algorithm}
 \usage{
-predict_next(input, tri_pruned, bi_pruned, uni_lookup, alpha = 0.4, top_k = 3)
+predict_next(
+  input,
+  tri_pruned,
+  bi_pruned,
+  uni_lookup,
+  alpha = 0.4,
+  top_k = 3,
+  uni_fallback = NULL
+)
 }
 \arguments{
 \item{input}{Character string. The input text to predict continuations for.
@@ -30,7 +38,8 @@ Will be cleaned and tokenized automatically using \code{extract_last_tokens}.}
   \item \code{word}: Word (character)
   \item \code{n}: Frequency count (numeric)
   \item \code{p}: Marginal probability (numeric)
-}}
+}
+Can also be a pre-computed unigram fallback table (see \code{uni_fallback} parameter).}
 
 \item{alpha}{Numeric. Backoff penalty factor (default: 0.4). Applied as:
 \itemize{
@@ -42,6 +51,11 @@ Lower values give stronger preference to higher-order n-grams.}
 
 \item{top_k}{Integer. Number of predictions to return (default: 3).
 Returns the top_k highest-scoring word predictions.}
+
+\item{uni_fallback}{Data frame or NULL. Pre-computed unigram fallback table with
+columns (word, score, source). If provided, skips recomputing alpha^2 * p for
+every prediction. Significantly speeds up batch predictions. If NULL (default),
+computes on-the-fly from \code{uni_lookup}.}
 }
 \value{
 Data frame with top_k predicted words containing columns:
