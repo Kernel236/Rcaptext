@@ -18,6 +18,10 @@
 #' @param timing_n Integer. Number of random test cases to time for performance
 #'   profiling (default: 200). Useful for assessing real-time usability.
 #' @param seed Integer. Random seed for reproducibility in timing sample (default: 123).
+#' @param max_eval_cases Integer or NULL. Maximum number of test cases to evaluate
+#'   (default: NULL = use all). For large test sets (e.g., 2M+ cases), setting this
+#'   to 10K-50K dramatically speeds up evaluation with minimal loss in accuracy
+#'   estimates. Samples randomly if provided.
 #' @param use_progress Logical. If TRUE, displays progress bars using progressr
 #'   and informative messages using cli (default: TRUE).
 #'
@@ -119,6 +123,7 @@ evaluate_accuracy_at_k <- function(
   timeit = TRUE,
   timing_n = 200,
   seed = 123,
+  max_eval_cases = NULL,
   use_progress = TRUE
 ) {
   stopifnot(all(c("input_text", "target") %in% names(test_windows)))
@@ -126,16 +131,46 @@ evaluate_accuracy_at_k <- function(
 
   # Wrapper for progress
   run_evaluation <- function() {
+    # ---- Optional sampling to reduce evaluation time ----
+    if (!is.null(max_eval_cases) && nrow(test_windows) > max_eval_cases) {
+      if (use_progress) {
+        cli::cli_h2("Evaluating model")
+        cli::cli_alert_info("Sampling {max_eval_cases} of {nrow(test_windows)} test cases for faster evaluation")
+      } else {
+        message(">> Sampling ", max_eval_cases, " of ", nrow(test_windows), " test cases")
+      }
+      set.seed(seed)
+      test_windows <- test_windows %>% dplyr::slice_sample(n = max_eval_cases)
+    } else {
+      if (use_progress) {
+        cli::cli_h2("Evaluating model ({nrow(test_windows)} test cases)")
+      }
+    }
+    
     if (use_progress) {
-      cli::cli_h2("Evaluating model")
-      cli::cli_alert_info("Pre-computing unigram fallback (sorted by score)...")
+      cli::cli_alert_info("Pre-computing unigram fallback...")
     }
     
     # ---- PRE-COMPUTE unigram fallback ONCE and SORT by score (HUGE performance boost!) ----
-    # This sorted version allows predict_next() to take only top-N unigrams instead of all 50K+
-    uni_fallback <- uni_lookup %>%
-      dplyr::transmute(word = .data$word, score = (alpha^2) * .data$p, source = "unigram") %>%
-      dplyr::arrange(dplyr::desc(.data$score))
+    # OPTIMIZATION: Use base R for speed on large uni_lookup (51K rows)
+    # Sort by p descending (already computed), multiply by alpha^2
+    alpha_sq <- alpha^2
+    
+    # Convert to data.frame for faster base R operations
+    uni_df <- as.data.frame(uni_lookup)
+    uni_df <- uni_df[order(-uni_df$p), ]  # Sort by p descending (fast!)
+    uni_df$score <- uni_df$p * alpha_sq
+    uni_df$source <- "unigram"
+    
+    # Convert back to tibble with only needed columns
+    uni_fallback <- dplyr::tibble(
+      word = uni_df$word,
+      score = uni_df$score,
+      source = uni_df$source
+    )
+    
+    rm(uni_df)  # Free memory
+    gc(verbose = FALSE)
     
     if (use_progress) {
       # Steps: nrow predictions + optional timing_n timings

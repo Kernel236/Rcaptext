@@ -14,6 +14,7 @@ evaluate_accuracy_at_k(
   timeit = TRUE,
   timing_n = 200,
   seed = 123,
+  max_eval_cases = NULL,
   use_progress = TRUE
 )
 }
@@ -40,6 +41,11 @@ accuracy@1, accuracy@3, and accuracy@5 (default: c(1, 2, 3)).}
 profiling (default: 200). Useful for assessing real-time usability.}
 
 \item{seed}{Integer. Random seed for reproducibility in timing sample (default: 123).}
+
+\item{max_eval_cases}{Integer or NULL. Maximum number of test cases to evaluate
+(default: NULL = use all). For large test sets (e.g., 2M+ cases), setting this
+to 10K-50K dramatically speeds up evaluation with minimal loss in accuracy
+estimates. Samples randomly if provided.}
 
 \item{use_progress}{Logical. If TRUE, displays progress bars using progressr
 and informative messages using cli (default: TRUE).}
